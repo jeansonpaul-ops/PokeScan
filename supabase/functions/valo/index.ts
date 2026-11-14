@@ -92,7 +92,9 @@ Deno.serve(async (req) => {
     const nm = fr?.conditions?.find((c: any) => c.condition === "NM")?.amount ?? (fr?.condition === "NM" ? fr.amount : null);
 
     // Pour une reverse, l'offre FR « foil » est plus juste que la cote générale
-    const rec = s.recommended ?? {};
+    // Sans offre FR « foil », la cote générale de Valo vise la version normale : on n'en tient pas compte pour une reverse
+    // deno-lint-ignore no-explicit-any
+    const rec: any = foil ? {} : (s.recommended ?? {});
     const useOffer = foil && fr?.amount != null;
     return json({
       match: true,
