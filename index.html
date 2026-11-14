@@ -242,6 +242,12 @@ details.fix .form{gap:12px}
 .sc-msg{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:14px;padding:28px;text-align:center;background:#0E0C1C;color:#D6D3E6}
 .sc-msg svg{width:44px;height:44px;opacity:.55}
 .sc-msg .btn{background:#fff;color:#1D1A33;border-color:#fff}
+.autohint{position:absolute;left:50%;top:12px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;max-width:calc(100% - 24px);padding:7px 13px;border-radius:999px;background:rgba(14,12,28,.78);color:#fff;font-size:13px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.autohint .dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--sun);animation:blink 1.1s ease-in-out infinite}
+.autohint.ok .dot{background:#2BC48A;animation:none}
+@keyframes blink{50%{opacity:.25}}
+.band.hot{border-style:solid;box-shadow:0 0 0 4px rgba(255,207,46,.28)}
+.frame.lock{outline:3px solid #2BC48A}
 .reading{position:absolute;left:0;right:0;height:3px;background:var(--sun);box-shadow:0 0 18px 5px rgba(255,207,46,.6);animation:sweep 1.4s ease-in-out infinite alternate}
 @keyframes sweep{from{top:12%}to{top:88%}}
 .sc-bottom{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
@@ -251,6 +257,8 @@ details.fix .form{gap:12px}
 .shutter{width:78px;height:78px;border-radius:50%;border:0;background:var(--sun);box-shadow:0 0 0 4px #0E0C1C,0 0 0 7px var(--sun);transition:transform .1s}
 .shutter:active{transform:scale(.93)}
 .shutter:disabled{opacity:.35;cursor:not-allowed}
+.shutter.auto{width:62px;height:62px;background:transparent;box-shadow:0 0 0 3px rgba(255,255,255,.55);display:grid;place-items:center;color:#fff}
+.shutter.auto::after{content:"";width:46px;height:46px;border-radius:50%;background:var(--sun);opacity:.9}
 .drawer{position:absolute;left:0;right:0;bottom:0;z-index:5;max-height:82%;overflow:auto;overscroll-behavior:contain;padding:10px 18px calc(18px + env(safe-area-inset-bottom));border-radius:26px 26px 0 0;background:var(--surface);color:var(--ink);box-shadow:0 -20px 40px rgba(0,0,0,.4);transform:translateY(105%);transition:transform .28s cubic-bezier(.3,.8,.3,1)}
 .drawer.open{transform:none}
 .drawer::before{content:"";display:block;width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 12px}
@@ -427,6 +435,7 @@ body.scanning .toast{bottom:calc(120px + env(safe-area-inset-bottom))}
     <img class="still" id="still" alt="" hidden>
     <div class="guide" aria-hidden="true"><div class="frame"><div class="band"><span>Code et numéro bien nets ici</span></div></div></div>
     <div class="reading" id="reading" hidden></div>
+    <div class="autohint" id="autoHint" role="status" hidden><span class="dot"></span><span id="autoHintText"></span></div>
     <div class="sc-msg" id="scMsg">
       <svg class="i" aria-hidden="true"><use href="#i-camera"/></svg>
       <p id="scMsgText">Activation de la caméra…</p>
@@ -434,11 +443,11 @@ body.scanning .toast{bottom:calc(120px + env(safe-area-inset-bottom))}
     </div>
   </div>
   <div class="drawer" id="drawer" aria-live="polite">
-      <div class="side-empty"><svg class="i" aria-hidden="true"><use href="#i-case"/></svg><p>Cadre une carte puis appuie sur le déclencheur. Le résultat s'affiche ici.</p></div>
+      <div class="side-empty"><svg class="i" aria-hidden="true"><use href="#i-case"/></svg><p>Place une carte dans le cadre : la lecture se fait toute seule, tu n'as plus qu'à valider.</p></div>
   </div>
   <div class="sc-bottom">
     <label class="btn"><svg class="i" aria-hidden="true"><use href="#i-image"/></svg>Photo<input type="file" accept="image/*" id="fileInput" hidden></label>
-    <button class="shutter" id="shutter" aria-label="Lire la carte" disabled></button>
+    <button class="shutter auto" id="shutter" aria-label="Forcer la lecture maintenant" title="Forcer la lecture" disabled></button>
     <button class="btn" id="typeBtn"><svg class="i" aria-hidden="true"><use href="#i-keys"/></svg>Taper</button>
   </div>
 </div>
@@ -1095,13 +1104,14 @@ async function startCamera(){
     const track = stream.getVideoTracks()[0], caps = track.getCapabilities?.() || {};
     $('#torch').hidden = !caps.torch; $('#torch').setAttribute('aria-pressed', 'false');
     if (caps.focusMode?.includes('continuous')) track.applyConstraints({ advanced:[{ focusMode:'continuous' }] }).catch(() => {});
+    if (scan.state === 'idle') autoStart();
   } catch (e) {
     stream = null;
     camMsg(e.name === 'NotAllowedError' ? 'Accès à la caméra refusé. Autorise-le dans les réglages du navigateur.' : 'Aucune caméra disponible. Utilise « Photo » ou « Taper ».', true);
   }
 }
 function camMsg(text, retry = false){ $('#scMsg').hidden = false; $('#scMsgText').textContent = text; $('#camRetry').hidden = !retry; $('#shutter').disabled = true; }
-function stopCamera(){ stream?.getTracks().forEach(t => t.stop()); stream = null; $('#video').srcObject = null; $('#shutter').disabled = true; $('#torch').hidden = true; }
+function stopCamera(){ autoStop(); stream?.getTracks().forEach(t => t.stop()); stream = null; $('#video').srcObject = null; $('#shutter').disabled = true; $('#torch').hidden = true; }
 $('#camRetry').onclick = () => startCamera();
 $('#torch').onclick = async e => {
   const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
@@ -1124,13 +1134,82 @@ function captureCard(){
   c.getContext('2d').drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
   return c;
 }
-$('#shutter').onclick = () => {
-  const v = $('#video'), c = captureCard(); if (!c) return;
-  const f = document.createElement('canvas'), m = Math.min(1, 1280 / v.videoWidth);
+function frameShot(){
+  const v = $('#video'), f = document.createElement('canvas'), m = Math.min(1, 1280 / v.videoWidth);
   f.width = Math.round(v.videoWidth * m); f.height = Math.round(v.videoHeight * m);
   f.getContext('2d').drawImage(v, 0, 0, f.width, f.height);
-  runScan(c, false, f.toDataURL('image/jpeg', .8));
+  return f.toDataURL('image/jpeg', .8);
+}
+// Secours : lecture complète immédiate (plusieurs bandes et réglages)
+$('#shutter').onclick = async () => {
+  const c = captureCard(); if (!c) return;
+  const url = frameShot();
+  while (AUTO.busy) await new Promise(r => setTimeout(r, 60));
+  runScan(c, false, url);
 };
+
+// ── Lecture automatique ─────────────────────────────────────
+// Toutes les ~300 ms : si l'image est stable, on lit la bande du bas.
+// Le même numéro doit être lu 2 fois avant de valider (évite les fausses lectures),
+// puis la même carte est ignorée tant qu'elle n'a pas quitté le cadre.
+const AUTO = { timer:null, busy:false, prev:null, votes:[], skip:null, misses:0, tick:0 };
+function autoHint(text, ok = false){
+  const h = $('#autoHint'); if (!h) return;
+  if (!text){ h.hidden = true; return; }
+  h.hidden = false; h.classList.toggle('ok', ok); $('#autoHintText').textContent = text;
+}
+function autoStart(){
+  autoStop(); AUTO.prev = null; AUTO.votes = []; AUTO.misses = 0;
+  $('.frame').classList.remove('lock');
+  autoHint('Place une carte dans le cadre');
+  AUTO.timer = setInterval(autoTick, 300);
+}
+function autoStop(){ clearInterval(AUTO.timer); AUTO.timer = null; autoHint(null); $('.band')?.classList.remove('hot'); }
+function thumbOf(c){
+  const t = document.createElement('canvas'); t.width = 24; t.height = 34;
+  const g = t.getContext('2d', { willReadFrequently:true }); g.drawImage(c, 0, 0, 24, 34);
+  const d = g.getImageData(0, 0, 24, 34).data, a = new Uint8Array(24 * 34);
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) a[j] = (d[i] + d[i+1] + d[i+2]) / 3;
+  return a;
+}
+const moveOf = (a, b) => { if (!a || !b) return 255; let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; };
+async function autoTick(){
+  if (AUTO.busy || !AUTO.timer || !stream || scan.state !== 'idle' || document.hidden || sheet.open) return;
+  const c = captureCard(); if (!c) return;
+  const th = thumbOf(c), mv = moveOf(th, AUTO.prev); AUTO.prev = th;
+  if (mv > 14){ AUTO.votes = []; if (AUTO.misses < 2) autoHint('Tiens la carte immobile'); return; }
+  AUTO.busy = true; $('.band').classList.add('hot');
+  try {
+    const ocr = await getOcr(t => autoHint(t));
+    const mode = AUTO.tick++ % 2 ? 'inv' : 'gray';
+    const band = bandCanvas(c, .885, .995, mode, 160);
+    const { data } = await ocr.recognize(band);
+    if (!AUTO.timer || scan.state !== 'idle') return;
+    const p = parseStrip(data.text);
+    if (!p){
+      AUTO.misses++;
+      if (AUTO.misses >= 3) AUTO.skip = null;        // la carte précédente a quitté le cadre
+      autoHint(AUTO.misses > 12 ? 'Rapproche la carte ou allume la lampe' : 'Cadre le code en bas de la carte');
+      return;
+    }
+    AUTO.misses = 0;
+    const key = `${+p.number}/${+p.total}`;
+    if (key === AUTO.skip){ autoHint('Carte suivante ?', true); return; }
+    AUTO.votes.push({ key, p, strip:band }); if (AUTO.votes.length > 4) AUTO.votes.shift();
+    const same = AUTO.votes.filter(v => v.key === key);
+    if (same.length < 2){ autoHint(`${[p.code, `${p.number}/${p.total}`].filter(Boolean).join(' ')} : vérification…`); return; }
+    // Sigle et langue : la valeur la plus souvent lue
+    const most = f => { const n = {}; same.forEach(v => { const x = v.p[f]; if (x) n[x] = (n[x] || 0) + 1; }); return Object.entries(n).sort((a, b) => b[1] - a[1])[0]?.[0] || null; };
+    const read = { ...p, code:most('code'), lang:most('lang'), strip:band.toDataURL('image/png') };
+    AUTO.skip = key; AUTO.votes = [];
+    $('.frame').classList.add('lock'); navigator.vibrate?.(35);
+    const url = frameShot();
+    autoStop();
+    runScan(c, false, url, read);
+  } catch (err) {
+    autoHint('Lecture impossible, nouvel essai…');
+  } finally { AUTO.busy = false; $('.band')?.classList.remove('hot'); }
+}
 $('#fileInput').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   try {
@@ -1140,17 +1219,17 @@ $('#fileInput').onchange = async e => {
     runScan(c, true, null);
   } catch { toast('Photo illisible. Essaie un JPEG ou un PNG.', 'err'); }
 };
-$('#typeBtn').onclick = () => { stopCamera(); setDrawer({ state:'manual' }); };
+$('#typeBtn').onclick = () => { autoStop(); setDrawer({ state:'manual' }); };
 
-async function runScan(canvas, wide = false, frameUrl = null){
-  stopCamera();
+async function runScan(canvas, wide = false, frameUrl = null, pre = null){
+  autoStop();
   const still = $('#still');
   still.src = frameUrl || canvas.toDataURL('image/jpeg', .85);
   still.style.objectFit = frameUrl ? 'cover' : 'contain';
   still.hidden = false; $('#scMsg').hidden = true; $('#reading').hidden = false;
   setDrawer({ state:'reading', text:'Lecture du code en bas de la carte…' });
   try {
-    const r = await readCode(canvas, text => setDrawer({ state:'reading', text }), wide);
+    const r = pre || await readCode(canvas, text => setDrawer({ state:'reading', text }), wide);
     if (!r.number){ setDrawer({ state:'manual', strip:r.strip, failed:true }); return; }
     setDrawer({ state:'reading', text:`${[r.code, r.lang?.toUpperCase(), `${r.number}/${r.total}`].filter(Boolean).join(' ')} lu. Recherche de la carte…`, strip:r.strip });
     await lookupAndShow(r);
@@ -1164,12 +1243,13 @@ async function lookupAndShow(q){
   if (r.cards.length === 1){ learn(q.code, r.cards[0].set?.id); showFound(r.cards[0], r.lang, q); return; }
   setDrawer({ state:'choose', cards:r.cards, lang:r.lang, query:q });
 }
+function resumeScan(keepSkip = false){ if (!keepSkip) AUTO.skip = null; setDrawer(null); $('.frame').classList.remove('lock'); if (stream) autoStart(); else startCamera(); }
 function showFound(tc, lang, q){ setDrawer({ state:'found', tc, rec:recordFrom(tc, { lang, code:q?.code }), query:q }); }
 
 function setDrawer(s){
   const d = $('#drawer');
   scan = s || { state:'idle' };
-  const empty = '<div class="side-empty"><svg class="i" aria-hidden="true"><use href="#i-case"/></svg><p>Cadre une carte puis appuie sur le déclencheur. Le résultat s\'affiche ici.</p></div>';
+  const empty = '<div class="side-empty"><svg class="i" aria-hidden="true"><use href="#i-case"/></svg><p>Place une carte dans le cadre : la lecture se fait toute seule, tu n\'as plus qu\'à valider.</p></div>';
   if (!s){ d.classList.remove('open'); d.innerHTML = empty; $('#still').hidden = true; return; }
   const strip = s.strip ? `<img class="strip" src="${s.strip}" alt="Bande lue en bas de la carte">` : '';
   const q = s.query || {};
@@ -1185,7 +1265,7 @@ function setDrawer(s){
         <label class="fld"><span>Numéro</span><input class="inp tab" name="number" value="${esc(q.number)}" placeholder="039" inputmode="numeric" required></label>
         <label class="fld"><span>Sur</span><input class="inp tab" name="total" value="${esc(q.total)}" placeholder="132" inputmode="numeric" required></label></div>
         <label class="fld"><span>Langue de la carte</span><select class="inp" name="lang">${Object.entries(LANGS).map(([k,v]) => `<option value="${k}" ${(q.lang||'fr')===k?'selected':''}>${v}</option>`).join('')}</select></label>
-        <div class="dr-acts"><button class="btn sun wide">Trouver la carte</button><button type="button" class="btn quiet wide" data-act="again">Reprendre une photo</button>
+        <div class="dr-acts"><button class="btn sun wide">Trouver la carte</button><button type="button" class="btn quiet wide" data-act="again">Relancer le scan</button>
         <button type="button" class="btn quiet wide" data-act="byname">Chercher par nom</button></div>
       </form>`;
     d.querySelector('#codeForm').onsubmit = async e => {
@@ -1199,7 +1279,7 @@ function setDrawer(s){
   if (s.state === 'choose'){
     d.innerHTML = empty + `<div class="dr-head"><div><h2>Laquelle est-ce ?</h2><p>${s.cards.length} sets ont une carte n° ${esc(q.number)}/${esc(q.total)}. Touche la tienne${q.code ? `, je retiendrai que « ${esc(q.code)} » désigne ce set` : ''}.</p></div></div>
       <div class="choices">${s.cards.map((c, i) => `<button class="hit" data-i="${i}">${cardImg({ image_url:c.image, number:c.localId })}<b>${esc(c.name)}</b><small>${esc(c.set?.name || '')}</small></button>`).join('')}</div>
-      <div class="dr-acts"><button class="btn quiet wide" data-act="again">Aucune : reprendre une photo</button></div>`;
+      <div class="dr-acts"><button class="btn quiet wide" data-act="again">Aucune : relancer le scan</button></div>`;
     d.querySelector('.choices').onclick = e => { const b = e.target.closest('[data-i]'); if (!b) return; const c = s.cards[+b.dataset.i]; learn(q.code, c.set?.id); showFound(c, s.lang, q); };
   }
   if (s.state === 'found'){
@@ -1207,17 +1287,18 @@ function setDrawer(s){
     d.innerHTML = empty + `<div class="found">${cardImg(r, 'low')}<div><b>${esc(r.name)}</b><p>${esc([r.set_name, r.number].filter(Boolean).join(', '))}</p><p>${esc(r.rarity || '')}</p>
       <p class="price tab" id="fPrice">${r.price_eur != null ? money(r.price_eur) : 'Pas de prix publié'}</p></div></div>
       ${formHTML(r, { fix:false })}
-      <div class="dr-acts"><button class="btn sun wide" data-act="add">Ajouter à ma vitrine</button><button class="btn quiet wide" data-act="wrong">Ce n'est pas la bonne carte</button><button class="btn quiet wide" data-act="again">Passer</button></div>`;
+      <div class="dr-acts"><button class="btn sun wide" data-act="add">Valider et ajouter</button><button class="btn quiet wide" data-act="wrong">Ce n'est pas la bonne carte</button><button class="btn quiet wide" data-act="pass">Passer</button></div>`;
     const form = d.querySelector('form');
     form.addEventListener('change', e => { if (e.target.name === 'finish'){ Object.assign(r, pricesFor(s.tc, e.target.value)); d.querySelector('#fPrice').textContent = r.price_eur != null ? money(r.price_eur) : 'Pas de prix publié'; } });
     d.querySelector('[data-act=add]').onclick = async e => {
       busy(e.currentTarget, true, 'Ajout…');
-      try { await addCard(readForm(form, r)); added++; $('#scCount').textContent = `${added} ajoutée${added > 1 ? 's' : ''}`; setDrawer(null); startCamera(); }
+      try { await addCard(readForm(form, r)); added++; $('#scCount').textContent = `${added} ajoutée${added > 1 ? 's' : ''}`; resumeScan(true); }
       catch (err) { toast('Ajout impossible : ' + err.message, 'err'); busy(e.currentTarget, false); }
     };
     d.querySelector('[data-act=wrong]').onclick = () => setDrawer({ state:'manual', query:s.query, strip:s.query?.strip });
   }
-  d.querySelectorAll('[data-act=again]').forEach(b => b.onclick = () => { setDrawer(null); startCamera(); });
+  d.querySelectorAll('[data-act=again]').forEach(b => b.onclick = () => resumeScan(false));
+  d.querySelectorAll('[data-act=pass]').forEach(b => b.onclick = () => resumeScan(true));
   d.querySelectorAll('[data-act=byname]').forEach(b => b.onclick = () => { closeScanner(); go('chercher'); $('#sq').focus(); });
   d.classList.add('open');
 }

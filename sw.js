@@ -1,7 +1,7 @@
 // PokéScan — service worker
 // Réseau d'abord pour les fichiers de l'appli (les mises à jour arrivent tout de suite),
 // copie en cache comme secours hors ligne. Les appels Supabase et CDN ne sont jamais mis en cache ici.
-const CACHE = 'pokescan-v4';
+const CACHE = 'pokescan-v4.1';
 const SHELL = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
