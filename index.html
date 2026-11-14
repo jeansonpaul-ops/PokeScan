@@ -596,6 +596,30 @@ async function getSets(lang){
 const setIdOf = cardId => cardId.slice(0, cardId.lastIndexOf('-'));
 function learned(){ return store.get('ps_codes', {}); }
 function learn(code, setId){ if (!code || !setId) return; const m = learned(); m[code] = setId; store.set('ps_codes', m); }
+// Sigle imprimé sur les cartes (« MEG », « CRI »…), d'après la fiche de la série chez TCGdex
+async function abbrFor(setId, lang = 'fr'){
+  if (!setId) return null;
+  const m = store.get('ps_abbr', {});
+  if (m[setId]) return m[setId];
+  try {
+    const s = await tcg(`v2/${LANGS[lang] ? lang : 'fr'}/sets/${encodeURIComponent(setId)}`);
+    const a = s?.abbreviation?.official || null;
+    if (a){ m[setId] = a; store.set('ps_abbr', m); }
+    return a;
+  } catch { return null; }
+}
+// Remet le bon sigle sur les cartes déjà enregistrées (une seule fois par carte)
+// (une correction faite à la main dans la fiche n'est jamais écrasée ensuite)
+async function fixCodes(){
+  const done = new Set(store.get('ps_codefix', []));
+  for (const c of cards.filter(c => c.tcg_id && !done.has(c.id))){
+    const a = await abbrFor(setIdOf(c.tcg_id), c.lang || 'fr');
+    if (!a) continue;
+    if (a !== c.set_code){ try { await patchCard(c.id, { set_code:a }); } catch { continue; } }
+    done.add(c.id);
+  }
+  store.set('ps_codefix', [...done]);
+}
 function codeForSet(setId){
   const m = { ...Object.fromEntries(Object.entries(SET_HINTS)), ...learned() };
   return Object.keys(m).find(k => m[k] === setId) || null;
@@ -851,6 +875,7 @@ async function loadCards(){
   if (error){ $('#summary').textContent = ''; toast('Vitrine illisible : ' + error.message, 'err'); return; }
   cards = data.map(c => ({ ...c, types:normTypes(c.types) }));
   renderVitrine(); if (view === 'bilan') renderBilan();
+  fixCodes().then(() => { renderVitrine(); if (view === 'bilan') renderBilan(); });
 }
 const pick = d => Object.fromEntries(COLUMNS.filter(k => d[k] !== undefined).map(k => [k, d[k] === '' ? null : d[k]]));
 async function patchCard(id, patch){
@@ -861,6 +886,7 @@ async function patchCard(id, patch){
   return data;
 }
 async function addCard(d){
+  if (d.tcg_id){ const a = await abbrFor(setIdOf(d.tcg_id), d.lang || 'fr'); if (a) d.set_code = a; }
   const dup = cards.find(c => dupKey(c) === dupKey(d));
   if (dup){
     const q = qtyOf(dup) + qtyOf(d);
@@ -872,6 +898,7 @@ async function addCard(d){
   if (error) throw error;
   data.types = normTypes(data.types);
   cards.unshift(data);
+  if (d.tcg_id) store.set('ps_codefix', [...store.get('ps_codefix', []), data.id]);
   toast(`${data.name} est dans ta vitrine.`);
   autoFr(data.id);
 }
