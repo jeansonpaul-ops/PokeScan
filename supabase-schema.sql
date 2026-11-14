@@ -113,3 +113,24 @@ create policy "Suppression dans sa vitrine" on public.cards for delete to authen
 -- insert into public.profiles (id, email, display_name, status, is_admin, decided_at)
 -- select id, lower(email), 'Paul', 'member', true, now() from auth.users where lower(email) = 'ton.email@exemple.com'
 -- on conflict (id) do update set status = 'member', is_admin = true;
+
+-- ════════════════════════════════════════════════════════════
+-- Journal des comptes (v4.4) — migration appliquée : pokescan_activity_log
+-- ════════════════════════════════════════════════════════════
+create table if not exists public.activity (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  action text not null check (action in ('login','logout','request','accepted','refused')),
+  at timestamptz not null default now()
+);
+create index if not exists activity_at_idx on public.activity (at desc);
+create index if not exists activity_user_idx on public.activity (user_id);
+alter table public.activity enable row level security;
+revoke all on public.activity from anon, authenticated;
+grant select, insert on public.activity to authenticated;
+create policy "Chacun note ses connexions" on public.activity for insert to authenticated
+  with check (user_id = (select auth.uid()) and action in ('login','logout'));
+create policy "Journal lisible par l'admin" on public.activity for select to authenticated
+  using ((select private.is_admin()));
+-- private.new_user() ajoute une ligne 'request' ; public.family_decide() ajoute 'accepted' ou 'refused'
+-- (voir la migration pour le corps complet des deux fonctions).

@@ -313,6 +313,18 @@ details.fix .form{gap:12px}
 .fam-row .who-txt small{display:block;color:var(--ink-3);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fam-row .btn{height:36px;padding:0 12px;font-size:14px}
 .bilan>.panel{min-width:0}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#E5484D;margin-left:6px;vertical-align:middle}
+.notes{display:grid;gap:18px}
+.notes h3{font-size:17px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.notes h3 small{font-size:13px;font-weight:600;color:var(--ink-3)}
+.notes ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px;color:var(--ink-2)}
+.notes .new{font-size:11px;font-weight:750;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--sun);color:#1D1A33}
+.log{display:grid}
+.log-row{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);font-size:14.5px}
+.log-row:first-child{border-top:0}
+.log-row time{flex:none;width:92px;color:var(--ink-3);font-size:13px;font-variant-numeric:tabular-nums}
+.log-row span{min-width:0}
+.log-more{margin-top:8px}
 .fam-row .btn{flex:none}
 .form-msg{min-height:20px;font-size:14px;color:var(--err)}
 .form-msg.ok{color:var(--ok)}
@@ -377,6 +389,7 @@ body.scanning .toast{bottom:calc(120px + env(safe-area-inset-bottom))}
     </nav>
     <div class="top-actions">
       <span class="who" id="who"></span>
+      <button class="btn quiet" data-action="notes">Nouveautés</button>
       <button class="btn quiet" data-action="logout"><svg class="i" aria-hidden="true"><use href="#i-out"/></svg>Déconnexion</button>
       <button class="btn sun" data-action="scan"><svg class="i" aria-hidden="true"><use href="#i-scan"/></svg>Scanner une carte</button>
     </div>
@@ -436,7 +449,8 @@ body.scanning .toast{bottom:calc(120px + env(safe-area-inset-bottom))}
         <section class="panel"><h2>Finitions</h2><div id="byFinish"></div></section>
         <section class="panel"><h2>Types</h2><div id="byType"></div></section>
         <section class="panel" id="famPanel" hidden><h2>Famille</h2><div id="famList"></div></section>
-        <section class="panel mobile-only"><h2>Compte</h2><p class="muted" id="acct"></p><div class="acts" style="margin-top:12px"><button class="btn" data-action="logout"><svg class="i" aria-hidden="true"><use href="#i-out"/></svg>Se déconnecter</button></div></section>
+        <section class="panel" id="logPanel" hidden><h2>Journal des comptes</h2><p class="muted">Connexions, déconnexions, demandes et décisions. Visible par toi seul.</p><div class="log" id="logList"></div></section>
+        <section class="panel"><h2>Compte</h2><p class="muted" id="acct"></p><div class="acts" style="margin-top:12px"><button class="btn" data-action="notes">Nouveautés</button><button class="btn" data-action="logout"><svg class="i" aria-hidden="true"><use href="#i-out"/></svg>Se déconnecter</button></div></section>
       </div>
     </section>
   </main>
@@ -851,7 +865,8 @@ document.addEventListener('click', e => {
   if (a){
     if (a.dataset.action === 'scan') openScanner();
     if (a.dataset.action === 'export') exportXlsx(a);
-    if (a.dataset.action === 'logout') sb.auth.signOut();
+    if (a.dataset.action === 'logout') logout(a);
+    if (a.dataset.action === 'notes') openNotes();
   }
   const s = e.target.closest('[data-step]');
   if (s){ const inp = s.parentElement.querySelector('input'); inp.value = Math.max(1, (parseInt(inp.value, 10) || 1) + Number(s.dataset.step)); }
@@ -890,6 +905,7 @@ $('#authForm').onsubmit = async e => {
   if (signup && !error && !data.session) ({ data, error } = await sb.auth.signInWithPassword({ email, password }));
   busy(btn, false);
   if (error){ msg.textContent = AUTH_ERR[error.message] || error.message; return; }
+  if (data?.user) note('login', data.user.id);
 };
 sb.auth.onAuthStateChange((_e, session) => setTimeout(() => setUser(session?.user ?? null), 0));
 async function setUser(u){
@@ -905,6 +921,8 @@ async function setUser(u){
   $('#who').textContent = me?.display_name || u.email; $('#acct').textContent = `Connecté avec ${u.email}`;
   go(location.hash.slice(1));
   loadCards(); loadPeople();
+  renderNotesDot();
+  if (notesSeen() !== APP_VERSION) toast(`PokéScan ${APP_VERSION} : regarde les nouveautés dans Bilan → Compte.`);
 }
 // Accès : seuls les membres acceptés par Paul entrent dans l'appli
 async function checkAccess(){
@@ -926,12 +944,77 @@ $('#gateCheck').onclick = async e => {
   busy(e.currentTarget, false);
   if (me?.status !== 'member') toast('Pas encore accepté. Réessaie un peu plus tard.');
 };
+// ── Journal des comptes ─────────────────────────────────────
+function note(action, uid){ sb.from('activity').insert({ user_id:uid, action }).then(() => {}, () => {}); }
+async function logout(btn){
+  if (user){ busy(btn, true, '…'); try { await sb.from('activity').insert({ user_id:user.id, action:'logout' }); } catch {} }
+  await sb.auth.signOut();
+  busy(btn, false);
+}
+const LOG_TXT = { login:'connexion', logout:'déconnexion', request:'demande d\'accès', accepted:'accès accepté', refused:'accès refusé ou retiré' };
+let logLimit = 30;
+async function loadLog(){
+  const panel = $('#logPanel');
+  if (!me?.is_admin){ panel.hidden = true; return; }
+  const { data, error } = await sb.from('activity').select('user_id,action,at').order('at', { ascending:false }).limit(logLimit + 1);
+  if (error){ panel.hidden = true; return; }
+  panel.hidden = false;
+  const rows = data.slice(0, logLimit);
+  const when = d => { const t = new Date(d), today = new Date().toDateString() === t.toDateString();
+    return today ? 'Aujourd\'hui ' + t.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : t.toLocaleDateString('fr-FR', { day:'numeric', month:'short' }) + ' ' + t.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }); };
+  $('#logList').innerHTML = rows.length
+    ? rows.map(r => `<div class="log-row"><time datetime="${esc(r.at)}">${esc(when(r.at))}</time><span><b>${esc(r.user_id === user.id ? 'Toi' : memberName(r.user_id))}</b> · ${LOG_TXT[r.action] || esc(r.action)}</span></div>`).join('')
+      + (data.length > logLimit ? '<button class="btn quiet log-more" id="logMore">Voir plus</button>' : '')
+    : '<p class="muted">Rien pour l\'instant.</p>';
+  $('#logMore')?.addEventListener('click', () => { logLimit += 30; loadLog(); });
+}
+
+// ── Notes de mise à jour ────────────────────────────────────
+const CHANGELOG = [
+  { v:'4.4', d:'14 nov. 2026', items:[
+    'Notes de mise à jour : elles s\'affichent ici à chaque nouvelle version.',
+    'Journal des comptes (pour Paul) : connexions, déconnexions, demandes d\'accès et décisions.',
+    'Le panneau Compte est visible aussi sur ordinateur.' ] },
+  { v:'4.3', d:'14 nov. 2026', items:[
+    'Comptes famille : « Demander l\'accès » sur l\'écran de connexion, validation par Paul.',
+    'Pastille sur Bilan quand une demande attend, panneau Famille pour accepter ou refuser.',
+    '« Voir la vitrine de » : la collection et le bilan des autres membres, en lecture seule.',
+    'La cote FR est réservée aux membres acceptés.' ] },
+  { v:'4.2', d:'14 nov. 2026', items:[
+    'Sigles : celui imprimé sur la carte (MEG, MEW, CRI, 30C…), et non plus celui deviné sur la photo.',
+    'Les cartes déjà enregistrées ont été corrigées ; une correction faite à la main n\'est jamais écrasée.',
+    'Cote FR : une reverse ne reçoit plus la cote de la version normale.' ] },
+  { v:'4.1', d:'14 nov. 2026', items:[
+    'Scanner automatique : pose la carte dans le cadre, la lecture se fait seule, tu valides.',
+    'Le même numéro doit être lu deux fois avant d\'être proposé, et la carte ajoutée est ignorée tant qu\'elle reste dans le cadre.',
+    'Le bouton jaune force une lecture plus poussée si besoin.' ] },
+  { v:'4.0', d:'14 nov. 2026', items:[
+    'Nouvelle vitrine, recherche par nom ou par code, bilan et export Excel.',
+    'Scan sans clé d\'API : lecture du code en bas de la carte, données TCGdex en français.',
+    'Cote FR via Valo (ventes eBay FR et offres Cardmarket FR quand elles existent).' ] },
+];
+const APP_VERSION = CHANGELOG[0].v;
+function notesSeen(){ return store.get('ps_seen', null); }
+function renderNotesDot(){
+  const fresh = notesSeen() !== APP_VERSION;
+  document.querySelectorAll('[data-action=notes]').forEach(b => {
+    const d = b.querySelector('.dot'); if (fresh && !d) b.insertAdjacentHTML('beforeend', '<span class="dot" aria-label="nouveau"></span>'); if (!fresh) d?.remove();
+  });
+}
+function openNotes(){
+  const seen = notesSeen();
+  const newer = v => !seen || v.localeCompare(seen, undefined, { numeric:true }) > 0;
+  openSheet(`<header class="sh-head"><h2 id="shTitle">Nouveautés</h2><button class="round" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></header>
+    <div class="sh-body"><div class="notes">${CHANGELOG.map(n => `<section><h3>Version ${esc(n.v)} <small>${esc(n.d)}</small>${newer(n.v) ? '<span class="new">Nouveau</span>' : ''}</h3><ul>${n.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></section>`).join('')}</div></div>`);
+  store.set('ps_seen', APP_VERSION); renderNotesDot();
+}
+
 // Membres de la famille (et demandes en attente pour l'admin)
 async function loadPeople(){
   const { data, error } = await sb.from('profiles').select('id,email,display_name,status,is_admin,created_at').order('created_at');
   if (error) return;
   people = data || [];
-  renderOwners(); renderFamily();
+  renderOwners(); renderFamily(); loadLog();
 }
 const memberName = id => people.find(p => p.id === id)?.display_name || 'Quelqu\'un';
 function renderOwners(){
