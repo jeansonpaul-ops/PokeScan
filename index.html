@@ -96,7 +96,7 @@ select.inp,.pick{appearance:none;background-image:url("data:image/svg+xml,%3Csvg
 }
 
 /* ── Dock mobile ─────────────────────────────── */
-.dock{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:40;height:var(--dock);display:grid;grid-template-columns:1fr 1fr 1.35fr 1fr;align-items:center;gap:4px;padding:6px;border-radius:24px;background:color-mix(in srgb,var(--surface) 94%,transparent);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid var(--line);box-shadow:var(--shadow)}
+.dock{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:40;height:var(--dock);display:grid;grid-template-columns:1fr 1fr 1.3fr 1fr 1fr;align-items:center;gap:2px;padding:6px;border-radius:24px;background:color-mix(in srgb,var(--surface) 94%,transparent);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid var(--line);box-shadow:var(--shadow)}
 @media(min-width:960px){.dock{display:none}}
 .dock button{height:100%;border:0;border-radius:18px;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11.5px;font-weight:650;color:var(--ink-3)}
 .dock button[aria-current=page]{color:var(--ink);background:var(--surface-2)}
@@ -313,16 +313,24 @@ details.fix .form{gap:12px}
 .fam-row .who-txt small{display:block;color:var(--ink-3);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fam-row .btn{height:36px;padding:0 12px;font-size:14px}
 .bilan>.panel{min-width:0}
+.me-card{display:flex;align-items:center;gap:16px;min-width:0}
+.me-txt{min-width:0}
+.me-txt .lede{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.avatar{flex:none;width:64px;height:64px;border-radius:22px;display:grid;place-items:center;background:var(--sun);color:#1D1A33;font-size:30px;font-weight:800;font-family:inherit}
+.dock button .dot{position:absolute;top:7px;left:calc(50% + 8px);margin:0}
+#notesLatest h3{font-size:16px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+#notesLatest h3 small{font-size:13px;font-weight:600;color:var(--ink-3)}
+#notesLatest ul{margin:8px 0 0;padding-left:20px;display:grid;gap:4px;color:var(--ink-2)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#E5484D;margin-left:6px;vertical-align:middle}
 .notes{display:grid;gap:18px}
 .notes h3{font-size:17px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .notes h3 small{font-size:13px;font-weight:600;color:var(--ink-3)}
 .notes ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px;color:var(--ink-2)}
-.notes .new{font-size:11px;font-weight:750;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--sun);color:#1D1A33}
+.notes .new,#notesLatest .new{font-size:11px;font-weight:750;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--sun);color:#1D1A33}
 .log{display:grid}
 .log-row{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);font-size:14.5px}
 .log-row:first-child{border-top:0}
-.log-row time{flex:none;width:92px;color:var(--ink-3);font-size:13px;font-variant-numeric:tabular-nums}
+.log-row time{flex:none;width:96px;white-space:nowrap;color:var(--ink-3);font-size:13px;font-variant-numeric:tabular-nums}
 .log-row span{min-width:0}
 .log-more{margin-top:8px}
 .fam-row .btn{flex:none}
@@ -352,6 +360,7 @@ body.scanning .toast{bottom:calc(120px + env(safe-area-inset-bottom))}
   <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5M20 20v-4h-4"/></symbol>
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M4 20h16"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
   <symbol id="i-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
   <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2.5l1.5-2h6l1.5 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/></symbol>
 </svg>
@@ -386,11 +395,10 @@ body.scanning .toast{bottom:calc(120px + env(safe-area-inset-bottom))}
       <button data-go="vitrine">Vitrine</button>
       <button data-go="chercher">Chercher</button>
       <button data-go="bilan">Bilan</button>
+      <button data-go="compte">Compte</button>
     </nav>
     <div class="top-actions">
       <span class="who" id="who"></span>
-      <button class="btn quiet" data-action="notes">Nouveautés</button>
-      <button class="btn quiet" data-action="logout"><svg class="i" aria-hidden="true"><use href="#i-out"/></svg>Déconnexion</button>
       <button class="btn sun" data-action="scan"><svg class="i" aria-hidden="true"><use href="#i-scan"/></svg>Scanner une carte</button>
     </div>
   </header>
@@ -448,9 +456,24 @@ body.scanning .toast{bottom:calc(120px + env(safe-area-inset-bottom))}
         <section class="panel"><h2>Les plus chères</h2><ol class="top" id="top"></ol></section>
         <section class="panel"><h2>Finitions</h2><div id="byFinish"></div></section>
         <section class="panel"><h2>Types</h2><div id="byType"></div></section>
+      </div>
+    </section>
+
+    <!-- Compte -->
+    <section id="v-compte" aria-labelledby="h-compte" hidden>
+      <div class="head">
+        <div class="me-card">
+          <span class="avatar" id="meAvatar" aria-hidden="true"></span>
+          <div class="me-txt"><h1 id="h-compte">Compte</h1><p class="lede" id="acct"></p></div>
+        </div>
+        <div class="acts">
+          <button class="btn" data-action="logout"><svg class="i" aria-hidden="true"><use href="#i-out"/></svg>Se déconnecter</button>
+        </div>
+      </div>
+      <div class="bilan">
         <section class="panel" id="famPanel" hidden><h2>Famille</h2><div id="famList"></div></section>
+        <section class="panel" id="notesPanel"><h2>Nouveautés</h2><div id="notesLatest"></div><button class="btn quiet log-more" data-action="notes">Toutes les versions</button></section>
         <section class="panel" id="logPanel" hidden><h2>Journal des comptes</h2><p class="muted">Connexions, déconnexions, demandes et décisions. Visible par toi seul.</p><div class="log" id="logList"></div></section>
-        <section class="panel"><h2>Compte</h2><p class="muted" id="acct"></p><div class="acts" style="margin-top:12px"><button class="btn" data-action="notes">Nouveautés</button><button class="btn" data-action="logout"><svg class="i" aria-hidden="true"><use href="#i-out"/></svg>Se déconnecter</button></div></section>
       </div>
     </section>
   </main>
@@ -460,6 +483,7 @@ body.scanning .toast{bottom:calc(120px + env(safe-area-inset-bottom))}
     <button data-go="chercher"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg>Chercher</button>
     <button class="dock-scan" data-action="scan"><svg class="i" aria-hidden="true"><use href="#i-scan"/></svg>Scanner</button>
     <button data-go="bilan"><svg class="i" aria-hidden="true"><use href="#i-chart"/></svg>Bilan</button>
+    <button data-go="compte"><svg class="i" aria-hidden="true"><use href="#i-user"/></svg>Compte</button>
   </nav>
 </div>
 
@@ -850,12 +874,13 @@ async function readCode(cardCanvas, onStatus, wide = false){
 
 // ── Navigation ──────────────────────────────────────────────
 function go(v){
-  if (!['vitrine','chercher','bilan'].includes(v)) v = 'vitrine';
+  if (!['vitrine','chercher','bilan','compte'].includes(v)) v = 'vitrine';
   view = v;
-  for (const s of ['vitrine','chercher','bilan']) $('#v-' + s).hidden = s !== v;
+  for (const s of ['vitrine','chercher','bilan','compte']) $('#v-' + s).hidden = s !== v;
   document.querySelectorAll('[data-go]').forEach(b => b.dataset.go === v ? b.setAttribute('aria-current','page') : b.removeAttribute('aria-current'));
   if (v === 'vitrine') renderVitrine();
   if (v === 'bilan') renderBilan();
+  if (v === 'compte') renderCompte();
   if (location.hash !== '#' + v) history.replaceState(null, '', '#' + v);
   window.scrollTo(0, 0);
 }
@@ -922,7 +947,7 @@ async function setUser(u){
   go(location.hash.slice(1));
   loadCards(); loadPeople();
   renderNotesDot();
-  if (notesSeen() !== APP_VERSION) toast(`PokéScan ${APP_VERSION} : regarde les nouveautés dans Bilan → Compte.`);
+  if (notesSeen() !== APP_VERSION) toast(`PokéScan ${APP_VERSION} : regarde les nouveautés dans l'onglet Compte.`);
 }
 // Accès : seuls les membres acceptés par Paul entrent dans l'appli
 async function checkAccess(){
@@ -961,7 +986,7 @@ async function loadLog(){
   panel.hidden = false;
   const rows = data.slice(0, logLimit);
   const when = d => { const t = new Date(d), today = new Date().toDateString() === t.toDateString();
-    return today ? 'Aujourd\'hui ' + t.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : t.toLocaleDateString('fr-FR', { day:'numeric', month:'short' }) + ' ' + t.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }); };
+    return today ? t.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : t.toLocaleDateString('fr-FR', { day:'numeric', month:'short' }) + ' ' + t.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }); };
   $('#logList').innerHTML = rows.length
     ? rows.map(r => `<div class="log-row"><time datetime="${esc(r.at)}">${esc(when(r.at))}</time><span><b>${esc(r.user_id === user.id ? 'Toi' : memberName(r.user_id))}</b> · ${LOG_TXT[r.action] || esc(r.action)}</span></div>`).join('')
       + (data.length > logLimit ? '<button class="btn quiet log-more" id="logMore">Voir plus</button>' : '')
@@ -971,6 +996,10 @@ async function loadLog(){
 
 // ── Notes de mise à jour ────────────────────────────────────
 const CHANGELOG = [
+  { v:'4.5', d:'14 nov. 2026', items:[
+    'Nouvel onglet Compte : ton profil, la famille, les nouveautés et le journal au même endroit.',
+    'Le Bilan ne montre plus que les chiffres de la collection.',
+    'La pastille des demandes d\'accès est maintenant sur l\'onglet Compte.' ] },
   { v:'4.4', d:'14 nov. 2026', items:[
     'Notes de mise à jour : elles s\'affichent ici à chaque nouvelle version.',
     'Journal des comptes (pour Paul) : connexions, déconnexions, demandes d\'accès et décisions.',
@@ -997,12 +1026,24 @@ const APP_VERSION = CHANGELOG[0].v;
 function notesSeen(){ return store.get('ps_seen', null); }
 function renderNotesDot(){
   const fresh = notesSeen() !== APP_VERSION;
-  document.querySelectorAll('[data-action=notes]').forEach(b => {
+  document.querySelectorAll('[data-action=notes], [data-go=compte]').forEach(b => {
+    if (b.matches('[data-go=compte]') && b.querySelector('.badge')){ b.querySelector('.dot')?.remove(); return; }
     const d = b.querySelector('.dot'); if (fresh && !d) b.insertAdjacentHTML('beforeend', '<span class="dot" aria-label="nouveau"></span>'); if (!fresh) d?.remove();
   });
 }
+function notesHTML(n){ return `<h3>Version ${esc(n.v)} <small>${esc(n.d)}</small></h3><ul>${n.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`; }
+function renderCompte(){
+  const name = me?.display_name || (user?.email || '').split('@')[0];
+  $('#h-compte').textContent = name || 'Compte';
+  $('#meAvatar').textContent = (name || '?').trim().charAt(0).toUpperCase();
+  $('#acct').textContent = user ? `${user.email}${me?.is_admin ? ' · administrateur' : ''}` : '';
+  $('#notesLatest').innerHTML = notesHTML(CHANGELOG[0]).replace('</small></h3>', `</small>${SEEN_AT_START !== APP_VERSION ? '<span class="new">Nouveau</span>' : ''}</h3>`);
+  renderFamily(); loadLog();
+  if (notesSeen() !== APP_VERSION){ store.set('ps_seen', APP_VERSION); renderNotesDot(); }
+}
+const SEEN_AT_START = store.get('ps_seen', null);          // dernière version lue à l'ouverture de l'appli
 function openNotes(){
-  const seen = notesSeen();
+  const seen = SEEN_AT_START;
   const newer = v => !seen || v.localeCompare(seen, undefined, { numeric:true }) > 0;
   openSheet(`<header class="sh-head"><h2 id="shTitle">Nouveautés</h2><button class="round" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></header>
     <div class="sh-body"><div class="notes">${CHANGELOG.map(n => `<section><h3>Version ${esc(n.v)} <small>${esc(n.d)}</small>${newer(n.v) ? '<span class="new">Nouveau</span>' : ''}</h3><ul>${n.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></section>`).join('')}</div></div>`);
@@ -1028,7 +1069,7 @@ async function showMine(){ if (!readOnly()) return; owner = null; $('#fOwner').v
 function renderFamily(){
   const panel = $('#famPanel'), pending = people.filter(p => p.status === 'pending');
   const members = people.filter(p => p.status === 'member'), refused = people.filter(p => p.status === 'refused');
-  document.querySelectorAll('[data-go=bilan]').forEach(b => {
+  document.querySelectorAll('[data-go=compte]').forEach(b => {
     let bd = b.querySelector('.badge');
     if (!me?.is_admin || !pending.length){ bd?.remove(); return; }
     if (!bd){ bd = document.createElement('span'); bd.className = 'badge'; b.append(bd); }
