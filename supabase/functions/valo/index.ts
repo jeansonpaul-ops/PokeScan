@@ -6,7 +6,8 @@
 //
 // Secrets (Supabase → Edge Functions → Secrets) :
 //   VALO_API_KEY    (obligatoire)  clé vd_test_… ou vd_live_…
-//   ALLOWED_EMAILS  (conseillé)    emails autorisés, séparés par des virgules (protège ton quota)
+//   ALLOWED_EMAILS  (facultatif)   emails autorisés, séparés par des virgules
+// Accès : uniquement les membres acceptés (table profiles, statut « member »)
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -47,9 +48,13 @@ Deno.serve(async (req) => {
 
   // Utilisateur connecté et autorisé
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!);
+  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } });
   const { data: { user } } = await sb.auth.getUser(token);
   if (!user) return json({ error: "Connecte-toi pour obtenir la cote FR." }, 401);
+  // Seuls les membres acceptés par l'administrateur consomment le quota Valo
+  const { data: prof } = await sb.from("profiles").select("status").eq("id", user.id).maybeSingle();
+  if (prof?.status !== "member") return json({ error: "Ton accès n'a pas encore été validé." }, 403);
   const allowed = (Deno.env.get("ALLOWED_EMAILS") ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
   if (allowed.length && !allowed.includes((user.email ?? "").toLowerCase())) {
     return json({ error: "Ce compte n'est pas autorisé à utiliser la cote FR." }, 403);

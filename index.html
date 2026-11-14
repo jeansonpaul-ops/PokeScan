@@ -298,6 +298,22 @@ details.fix .form{gap:12px}
 .auth .brand{margin-bottom:16px}
 .auth h1{font-size:clamp(36px,10vw,50px)}
 .auth .lede{margin-top:-4px}
+.gate{width:100%;max-width:400px;display:grid;gap:16px}
+.gate h1{font-size:clamp(32px,9vw,44px)}
+.badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:#E5484D;color:#fff;font-size:11px;font-weight:750;line-height:1}
+.dock button{position:relative}
+.dock .badge{position:absolute;top:5px;left:calc(50% + 6px);margin:0}
+.owner{display:inline-flex;align-items:center;gap:8px;margin-top:10px;font-weight:620;color:var(--ink-2)}
+.ro-note{margin-top:8px;color:var(--ink-3);font-size:14px}
+.fam-sub{margin:14px 0 4px;font-size:12.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3)}
+.fam-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.fam-sub+.fam-row{border-top:0}
+.fam-row .who-txt{flex:1;min-width:0}
+.fam-row .who-txt b{display:block}
+.fam-row .who-txt small{display:block;color:var(--ink-3);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fam-row .btn{height:36px;padding:0 12px;font-size:14px}
+.bilan>.panel{min-width:0}
+.fam-row .btn{flex:none}
 .form-msg{min-height:20px;font-size:14px;color:var(--err)}
 .form-msg.ok{color:var(--ok)}
 
@@ -334,12 +350,20 @@ body.scanning .toast{bottom:calc(120px + env(safe-area-inset-bottom))}
     <div class="brand"><svg aria-hidden="true"><use href="#i-brand"/></svg>PokéScan</div>
     <h1 id="authTitle">Ta collection, rangée comme en vitrine.</h1>
     <p class="lede" id="authLede">Connecte-toi pour retrouver tes cartes sur tous tes appareils.</p>
+    <label class="fld" id="nameFld" hidden><span>Prénom</span><input class="inp" name="name" autocomplete="given-name" maxlength="40"></label>
     <label class="fld"><span>Email</span><input class="inp" type="email" name="email" autocomplete="email" required></label>
     <label class="fld"><span>Mot de passe</span><input class="inp" type="password" name="password" autocomplete="current-password" minlength="6" required></label>
     <p class="form-msg" id="authMsg" role="alert"></p>
     <button class="btn sun wide" id="authSubmit">Se connecter</button>
-    <button class="btn quiet wide" type="button" id="authSwitch">Créer un compte</button>
+    <button class="btn quiet wide" type="button" id="authSwitch">Demander l'accès</button>
   </form>
+  <div class="gate" id="gate" hidden>
+    <div class="brand"><svg aria-hidden="true"><use href="#i-brand"/></svg>PokéScan</div>
+    <h1 id="gateTitle">Demande envoyée.</h1>
+    <p class="lede" id="gateLede"></p>
+    <button class="btn sun wide" id="gateCheck">Vérifier à nouveau</button>
+    <button class="btn quiet wide" data-action="logout">Se déconnecter</button>
+  </div>
 </div>
 
 <!-- ═══ Application ═══ -->
@@ -363,6 +387,8 @@ body.scanning .toast{bottom:calc(120px + env(safe-area-inset-bottom))}
     <section id="v-vitrine" aria-labelledby="h-vitrine">
       <div class="head">
         <h1 id="h-vitrine">Ma vitrine</h1>
+        <label class="owner" id="ownerWrap" hidden><span>Voir la vitrine de</span><select class="pick" id="fOwner"></select></label>
+        <p class="ro-note" id="roNote" hidden>Lecture seule : tu peux regarder, pas modifier.</p>
         <p class="lede" id="summary"></p>
         <div class="filters">
           <label class="search"><span class="sr">Filtrer ma vitrine</span><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><input class="inp" type="search" id="q" placeholder="Filtrer : nom, set, numéro" autocomplete="off"></label>
@@ -409,6 +435,7 @@ body.scanning .toast{bottom:calc(120px + env(safe-area-inset-bottom))}
         <section class="panel"><h2>Les plus chères</h2><ol class="top" id="top"></ol></section>
         <section class="panel"><h2>Finitions</h2><div id="byFinish"></div></section>
         <section class="panel"><h2>Types</h2><div id="byType"></div></section>
+        <section class="panel" id="famPanel" hidden><h2>Famille</h2><div id="famList"></div></section>
         <section class="panel mobile-only"><h2>Compte</h2><p class="muted" id="acct"></p><div class="acts" style="margin-top:12px"><button class="btn" data-action="logout"><svg class="i" aria-hidden="true"><use href="#i-out"/></svg>Se déconnecter</button></div></section>
       </div>
     </section>
@@ -500,6 +527,8 @@ const OCR_LANGS = {FR:'fr',EN:'en',DE:'de',IT:'it',ES:'es',PT:'pt',NL:'nl',JP:'j
 
 // ── État ────────────────────────────────────────────────────
 let user = null, cards = [], view = 'vitrine';
+let me = null, people = [], owner = null;          // profil, membres (et demandes pour l'admin), vitrine affichée
+const readOnly = () => !!(owner && user && owner !== user.id);
 const filt = { q:'', type:null, set:'', finish:'', sort:'recent' };
 let stream = null, scan = { state:'idle' }, added = 0;
 
@@ -838,44 +867,123 @@ const AUTH_ERR = {
 };
 $('#authSwitch').onclick = () => {
   signup = !signup;
-  $('#authTitle').textContent = signup ? 'Crée ta vitrine.' : 'Ta collection, rangée comme en vitrine.';
-  $('#authLede').textContent = signup ? 'Un email et un mot de passe de 6 caractères au moins.' : 'Connecte-toi pour retrouver tes cartes sur tous tes appareils.';
-  $('#authSubmit').textContent = signup ? 'Créer le compte' : 'Se connecter';
-  $('#authSwitch').textContent = signup ? 'J\'ai déjà un compte' : 'Créer un compte';
+  $('#authTitle').textContent = signup ? 'Demande ton accès.' : 'Ta collection, rangée comme en vitrine.';
+  $('#authLede').textContent = signup ? 'Ton prénom, ton email et un mot de passe (6 caractères au moins). Paul valide ensuite ta demande.' : 'Connecte-toi pour retrouver tes cartes sur tous tes appareils.';
+  $('#authSubmit').textContent = signup ? 'Envoyer la demande' : 'Se connecter';
+  $('#authSwitch').textContent = signup ? 'J\'ai déjà un compte' : 'Demander l\'accès';
+  $('#nameFld').hidden = !signup;
   $('#authForm [name=password]').autocomplete = signup ? 'new-password' : 'current-password';
   $('#authMsg').textContent = '';
 };
 $('#authForm').onsubmit = async e => {
   e.preventDefault();
   const fd = new FormData(e.target), msg = $('#authMsg'), btn = $('#authSubmit');
-  const email = String(fd.get('email') || '').trim(), password = String(fd.get('password') || '');
+  const email = String(fd.get('email') || '').trim(), password = String(fd.get('password') || ''), name = String(fd.get('name') || '').trim();
   msg.className = 'form-msg';
   if (!email || password.length < 6){ msg.textContent = 'Entre ton email et un mot de passe d\'au moins 6 caractères.'; return; }
-  busy(btn, true, signup ? 'Création…' : 'Connexion…');
-  const { data, error } = signup ? await sb.auth.signUp({ email, password, options:{ emailRedirectTo:location.href.split('#')[0] } }) : await sb.auth.signInWithPassword({ email, password });
+  if (signup && !name){ msg.textContent = 'Indique ton prénom pour que Paul te reconnaisse.'; return; }
+  busy(btn, true, signup ? 'Envoi…' : 'Connexion…');
+  let { data, error } = signup
+    ? await sb.auth.signUp({ email, password, options:{ data:{ name }, emailRedirectTo:location.href.split('#')[0] } })
+    : await sb.auth.signInWithPassword({ email, password });
+  // Les demandes sont confirmées d'office côté base : on connecte directement
+  if (signup && !error && !data.session) ({ data, error } = await sb.auth.signInWithPassword({ email, password }));
   busy(btn, false);
   if (error){ msg.textContent = AUTH_ERR[error.message] || error.message; return; }
-  if (signup && !data.session){ msg.className = 'form-msg ok'; msg.textContent = 'Compte créé. Ouvre le lien reçu par email pour le confirmer.'; }
 };
 sb.auth.onAuthStateChange((_e, session) => setTimeout(() => setUser(session?.user ?? null), 0));
-function setUser(u){
-  if (u && user?.id === u.id) return;
+async function setUser(u){
+  if (u && user?.id === u.id && me?.status === 'member') return;
   user = u;
-  $('#auth').hidden = !!u; $('#app').hidden = !u;
-  if (!u){ cards = []; closeScanner(); return; }
-  $('#who').textContent = u.email; $('#acct').textContent = `Connecté avec ${u.email}`;
+  if (!u){
+    me = null; people = []; owner = null; cards = []; closeScanner();
+    $('#app').hidden = true; $('#auth').hidden = false; $('#authForm').hidden = false; $('#gate').hidden = true;
+    return;
+  }
+  if (!(await checkAccess())) return;
+  $('#auth').hidden = true; $('#app').hidden = false;
+  $('#who').textContent = me?.display_name || u.email; $('#acct').textContent = `Connecté avec ${u.email}`;
   go(location.hash.slice(1));
-  loadCards();
+  loadCards(); loadPeople();
 }
+// Accès : seuls les membres acceptés par Paul entrent dans l'appli
+async function checkAccess(){
+  const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  me = error ? { id:user.id, status:'member' } : (data || { id:user.id, status:'pending' });   // la base garde le dernier mot
+  if (me.status === 'member') return true;
+  $('#app').hidden = true; $('#auth').hidden = false; $('#authForm').hidden = true; $('#gate').hidden = false;
+  const refused = me.status === 'refused';
+  $('#gateTitle').textContent = refused ? 'Demande refusée.' : 'Demande envoyée.';
+  $('#gateLede').textContent = refused
+    ? 'Paul n\'a pas accepté cette demande. Parles-en avec lui si c\'est une erreur.'
+    : `Paul doit accepter ta demande (${user.email}). Reviens ici ensuite et appuie sur « Vérifier à nouveau ».`;
+  $('#gateCheck').hidden = refused;
+  return false;
+}
+$('#gateCheck').onclick = async e => {
+  busy(e.currentTarget, true, 'Vérification…');
+  const u = user; user = null; await setUser(u);
+  busy(e.currentTarget, false);
+  if (me?.status !== 'member') toast('Pas encore accepté. Réessaie un peu plus tard.');
+};
+// Membres de la famille (et demandes en attente pour l'admin)
+async function loadPeople(){
+  const { data, error } = await sb.from('profiles').select('id,email,display_name,status,is_admin,created_at').order('created_at');
+  if (error) return;
+  people = data || [];
+  renderOwners(); renderFamily();
+}
+const memberName = id => people.find(p => p.id === id)?.display_name || 'Quelqu\'un';
+function renderOwners(){
+  const members = people.filter(p => p.status === 'member');
+  $('#ownerWrap').hidden = members.length < 2;
+  $('#fOwner').innerHTML = members.map(p => `<option value="${esc(p.id)}">${p.id === user.id ? 'Moi' : esc(p.display_name)}</option>`).join('');
+  $('#fOwner').value = owner || user.id;
+}
+$('#fOwner').addEventListener('change', e => { owner = e.target.value === user.id ? null : e.target.value; loadCards(); });
+async function showMine(){ if (!readOnly()) return; owner = null; $('#fOwner').value = user.id; await loadCards(); }
+function renderFamily(){
+  const panel = $('#famPanel'), pending = people.filter(p => p.status === 'pending');
+  const members = people.filter(p => p.status === 'member'), refused = people.filter(p => p.status === 'refused');
+  document.querySelectorAll('[data-go=bilan]').forEach(b => {
+    let bd = b.querySelector('.badge');
+    if (!me?.is_admin || !pending.length){ bd?.remove(); return; }
+    if (!bd){ bd = document.createElement('span'); bd.className = 'badge'; b.append(bd); }
+    bd.textContent = pending.length; bd.setAttribute('aria-label', plural(pending.length, 'demande', 'demandes') + ' en attente');
+  });
+  panel.hidden = !me?.is_admin && members.length < 2;
+  const row = (p, acts = '') => `<div class="fam-row"><span class="who-txt"><b>${esc(p.display_name || '—')}${p.id === user.id ? ' (toi)' : ''}</b>${me?.is_admin ? `<small>${esc(p.email)}</small>` : ''}</span>${acts}</div>`;
+  const ok = p => `<button class="btn sun" data-fam="${esc(p.id)}" data-ok="1">Accepter</button>`, no = p => `<button class="btn" data-fam="${esc(p.id)}" data-ok="0">Refuser</button>`;
+  $('#famList').innerHTML =
+    (me?.is_admin ? (pending.length ? `<p class="fam-sub">Demandes en attente</p>${pending.map(p => row(p, no(p) + ok(p))).join('')}` : '<p class="muted">Aucune demande en attente. Pour inviter quelqu\'un, envoie-lui l\'adresse de l\'appli : il choisit « Demander l\'accès ».</p>') : '') +
+    `<p class="fam-sub">Membres</p>${members.map(p => row(p, me?.is_admin && p.id !== user.id ? no(p).replace('Refuser', 'Retirer') : '')).join('')}` +
+    (me?.is_admin && refused.length ? `<p class="fam-sub">Refusés</p>${refused.map(p => row(p, ok(p))).join('')}` : '');
+}
+$('#famList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-fam]'); if (!b) return;
+  const accept = b.dataset.ok === '1', p = people.find(x => x.id === b.dataset.fam);
+  if (!accept && p?.status === 'member' && !b.classList.contains('armed')){ b.classList.add('armed'); b.textContent = 'Confirmer'; return; }
+  busy(b, true, '…');
+  const { error } = await sb.rpc('family_decide', { p_id:b.dataset.fam, p_accept:accept });
+  if (error){ toast('Impossible : ' + error.message, 'err'); busy(b, false); return; }
+  toast(accept ? `${p?.display_name || 'Membre'} a maintenant accès à PokéScan.` : `${p?.display_name || 'Cette personne'} n'a plus accès.`);
+  if (!accept && owner === p?.id) await showMine();
+  loadPeople();
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden && me?.is_admin) loadPeople(); });
 
 // ── Données ─────────────────────────────────────────────────
 async function loadCards(){
   $('#summary').textContent = 'Ouverture de la vitrine…';
-  const { data, error } = await sb.from('cards').select('*').order('created_at', { ascending:false });
+  const who = owner || user.id;
+  const { data, error } = await sb.from('cards').select('*').eq('user_id', who).order('created_at', { ascending:false });
+  if (who !== (owner || user.id)) return;                    // on a changé de vitrine entre-temps
   if (error){ $('#summary').textContent = ''; toast('Vitrine illisible : ' + error.message, 'err'); return; }
   cards = data.map(c => ({ ...c, types:normTypes(c.types) }));
+  $('#h-vitrine').textContent = readOnly() ? `Vitrine de ${memberName(owner)}` : 'Ma vitrine';
+  $('#roNote').hidden = !readOnly();
   renderVitrine(); if (view === 'bilan') renderBilan();
-  fixCodes().then(() => { renderVitrine(); if (view === 'bilan') renderBilan(); });
+  if (!readOnly()) fixCodes().then(() => { if (!readOnly()){ renderVitrine(); if (view === 'bilan') renderBilan(); } });
 }
 const pick = d => Object.fromEntries(COLUMNS.filter(k => d[k] !== undefined).map(k => [k, d[k] === '' ? null : d[k]]));
 async function patchCard(id, patch){
@@ -886,6 +994,7 @@ async function patchCard(id, patch){
   return data;
 }
 async function addCard(d){
+  await showMine();                                          // on ajoute toujours dans sa propre vitrine
   if (d.tcg_id){ const a = await abbrFor(setIdOf(d.tcg_id), d.lang || 'fr'); if (a) d.set_code = a; }
   const dup = cards.find(c => dupKey(c) === dupKey(d));
   if (dup){
@@ -939,12 +1048,17 @@ function filtered(){
 function summaryHTML(){
   const n = cards.reduce((s,c) => s + qtyOf(c), 0), v = cards.reduce((s,c) => s + valueOf(c), 0);
   const sets = new Set(cards.map(c => c.set_code || c.set_name).filter(Boolean)).size;
-  return `Tes <b>${plural(n,'carte','cartes')}</b>${sets ? ` de ${plural(sets,'set','sets')}` : ''}` +
-    (v ? ` valent environ <b>${money(v)}</b> sur Cardmarket.` : '.') +
+  const one = n === 1, who = readOnly() ? (one ? 'Sa' : 'Ses') : (one ? 'Ta' : 'Tes');
+  return `${who} <b>${plural(n,'carte','cartes')}</b>${sets ? ` de ${plural(sets,'set','sets')}` : ''}` +
+    (v ? ` ${one ? 'vaut' : 'valent'} environ <b>${money(v)}</b> sur Cardmarket.` : '.') +
     (cards.some(c => c.price_fr != null) ? ` <span class="muted">${plural(cards.filter(c => c.price_fr != null).length,'carte estimée','cartes estimées')} avec la cote FR.</span>` : '');
 }
 function renderGrid(){
   const list = filtered(), grid = $('#grid'), empty = $('#empty');
+  if (!cards.length && readOnly()){
+    $('#summary').textContent = 'Cette vitrine est encore vide.';
+    grid.innerHTML = ''; empty.hidden = true; return;
+  }
   if (!cards.length){
     $('#summary').textContent = 'Ta vitrine attend sa première carte.';
     grid.innerHTML = ''; empty.hidden = false;
@@ -1006,6 +1120,11 @@ function factsHTML(c){
 function openSheet(html){ sheet.innerHTML = html; sheet.showModal(); document.body.classList.add('locked'); }
 function openCard(id){
   const c = cards.find(x => x.id === id); if (!c) return;
+  if (readOnly()){
+    openSheet(`<header class="sh-head"><h2 id="shTitle">${esc(c.name)}</h2><button class="round" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></header>
+      <div class="sh-body"><div class="sh-visual">${slab(c, 'high', 'div')}${factsHTML(c)}</div><p class="muted">Carte de la vitrine de ${esc(memberName(owner))}.</p></div>`);
+    return;
+  }
   if (c.tcg_id && !c.name_en && (c.lang || 'fr') !== 'en'){
     tcg(`v2/en/cards/${encodeURIComponent(c.tcg_id)}`).then(en => {
       if (!en?.name) return; c.name_en = en.name;
@@ -1107,6 +1226,7 @@ $('#results').addEventListener('click', e => {
 //  Scanner
 // ════════════════════════════════════════════════════════════
 function openScanner(){
+  showMine();
   $('#scanner').hidden = false; document.body.classList.add('locked', 'scanning');
   added = 0; $('#scCount').textContent = '';
   setDrawer(null); startCamera();
@@ -1338,6 +1458,8 @@ function bars(rows, fmt, color){
     <span class="track"><span class="fill" style="width:${(r.v / max * 100).toFixed(1)}%;${color ? `--fc:${color(r)}` : ''}"></span></span></div>`).join('');
 }
 function renderBilan(){
+  $('#refreshAll').hidden = readOnly();
+  $('#h-bilan').textContent = readOnly() ? `Bilan de ${memberName(owner)}` : 'Bilan';
   const priced = cards.filter(c => priceOf(c) != null).length;
   $('#bilanSummary').innerHTML = cards.length ? summaryHTML() + (priced < cards.length ? ` ${plural(cards.length - priced,'carte n\'a','cartes n\'ont')} pas de prix.` : '') : 'Le bilan se remplit dès ta première carte.';
   const anyV = priced > 0, bySet = new Map();
