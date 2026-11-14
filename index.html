@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PokéScan</title>
+<meta name="description" content="La vitrine de tes cartes Pokémon : scan gratuit, valeur Cardmarket, export Excel.">
+<meta name="theme-color" content="#EEEBF5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141226" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PokéScan">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api.tcgdex.net">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:light dark;
+  --bg:#EEEBF5; --surface:#FFFFFF; --surface-2:#F6F4FA; --line:#DDD8EA;
+  --ink:#1D1A33; --ink-2:#5D5878; --ink-3:#8C87A5;
+  --sun:#FFCF2E; --sun-ink:#1D1A33; --cobalt:#3155E0;
+  --ok:#1B8A55; --err:#D23B2A;
+  --shadow:0 1px 2px rgba(29,26,51,.06),0 12px 28px -16px rgba(29,26,51,.38);
+  --font:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --dock:72px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#141226; --surface:#1E1B36; --surface-2:#26223F; --line:#342F54;
+  --ink:#F2F0FA; --ink-2:#B3AECB; --ink-3:#7D7898; --cobalt:#8EA4FF;
+  --ok:#54D08F; --err:#FF7B6B; --shadow:0 1px 2px rgba(0,0,0,.3),0 14px 30px -16px rgba(0,0,0,.7);
+}}
+*{box-sizing:border-box;margin:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--font);font-optical-sizing:auto;font-size:15.5px;line-height:1.45;color:var(--ink);background:var(--bg);min-height:100dvh;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+body.locked{overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+img{display:block;max-width:100%}
+[hidden]{display:none!important}
+:focus-visible{outline:2.5px solid var(--cobalt);outline-offset:2px}
+.tab{font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── Contrôles ───────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:46px;padding:0 18px;border-radius:14px;border:1px solid var(--line);background:var(--surface);font-weight:650;white-space:nowrap;transition:transform .12s,background .15s,border-color .15s}
+.btn:active{transform:scale(.98)}
+.btn:hover{border-color:var(--ink-3)}
+.btn.sun{background:var(--sun);border-color:var(--sun);color:var(--sun-ink)}
+.btn.sun:hover{filter:brightness(1.04)}
+.btn.ink{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn.quiet{background:transparent;border-color:transparent;color:var(--ink-2)}
+.btn.quiet:hover{background:var(--surface-2)}
+.btn.danger{color:var(--err)}
+.btn.danger.armed{background:var(--err);border-color:var(--err);color:#fff}
+.btn.wide{width:100%}
+.btn:disabled,.btn.busy{opacity:.55;pointer-events:none}
+.round{width:42px;height:42px;border-radius:50%;border:0;display:grid;place-items:center;background:var(--surface-2);color:var(--ink-2)}
+.inp{height:46px;width:100%;min-width:0;padding:0 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.inp:focus{outline:none;border-color:var(--cobalt)}
+textarea.inp{height:auto;padding:11px 14px;resize:vertical}
+select.inp,.pick{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238C87A5' stroke-width='2.6' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:34px}
+.fld{display:grid;gap:6px;border:0;padding:0;min-width:0}
+.fld>span,.fld>legend{font-size:13px;font-weight:620;color:var(--ink-2);padding:0}
+.fld>legend{margin-bottom:6px}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opts{display:flex;flex-wrap:wrap;gap:6px}
+.opt{position:relative}
+.opt input{position:absolute;opacity:0;width:1px;height:1px}
+.opt span{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 13px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:14px;font-weight:600;color:var(--ink-2);user-select:none;cursor:pointer}
+.opt input:checked+span{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.opt input:focus-visible+span{outline:2.5px solid var(--cobalt);outline-offset:2px}
+.stepper{display:grid;grid-template-columns:46px 1fr 46px;height:46px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.stepper button{border:0;background:none;font-size:22px;color:var(--ink-2)}
+.stepper input{border:0;background:none;text-align:center;font-weight:750;font-size:17px;width:100%;min-width:0;-moz-appearance:textfield}
+.stepper input::-webkit-inner-spin-button{-webkit-appearance:none}
+
+/* ── Barre du haut ───────────────────────────── */
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:16px;height:calc(58px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 16px 0;background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:18px;font-stretch:88%;letter-spacing:-.01em}
+.brand svg{width:30px;height:30px}
+.topnav{display:none}
+.top-actions{margin-left:auto;display:none;align-items:center;gap:10px}
+.who{font-size:13.5px;color:var(--ink-3);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(min-width:960px){
+  .topbar{height:70px;padding:0 32px;border-bottom:1px solid var(--line)}
+  .topnav{display:flex;gap:4px;margin-left:24px}
+  .topnav button{position:relative;height:40px;padding:0 14px;border:0;border-radius:12px;background:none;font-weight:620;color:var(--ink-2)}
+  .topnav button:hover{background:var(--surface-2)}
+  .topnav button[aria-current=page]{color:var(--ink);background:var(--surface)}
+  .top-actions{display:flex}
+}
+
+/* ── Dock mobile ─────────────────────────────── */
+.dock{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:40;height:var(--dock);display:grid;grid-template-columns:1fr 1fr 1.35fr 1fr;align-items:center;gap:4px;padding:6px;border-radius:24px;background:color-mix(in srgb,var(--surface) 94%,transparent);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:1px solid var(--line);box-shadow:var(--shadow)}
+@media(min-width:960px){.dock{display:none}}
+.dock button{height:100%;border:0;border-radius:18px;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11.5px;font-weight:650;color:var(--ink-3)}
+.dock button[aria-current=page]{color:var(--ink);background:var(--surface-2)}
+.dock .dock-scan{flex-direction:row;gap:7px;background:var(--sun);color:var(--sun-ink);font-size:14.5px;font-weight:750}
+.dock .dock-scan svg{width:22px;height:22px;stroke-width:2.1}
+
+/* ── Pages ───────────────────────────────────── */
+main{width:100%;max-width:1360px;margin:0 auto;padding:8px 16px calc(var(--dock) + 40px + env(safe-area-inset-bottom))}
+@media(min-width:600px){main{padding-left:24px;padding-right:24px}}
+@media(min-width:960px){main{padding:36px 32px 64px}}
+.head{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin:6px 0 20px}
+h1{font-size:clamp(34px,8vw,52px);font-weight:800;font-stretch:84%;letter-spacing:-.025em;line-height:.98;font-variation-settings:"opsz" 96}
+h2{font-size:19px;font-weight:750;font-stretch:90%;letter-spacing:-.01em;line-height:1.2}
+.lede{font-size:clamp(16.5px,2.4vw,19px);color:var(--ink-2);max-width:46ch;line-height:1.4}
+.lede b{color:var(--ink);font-weight:750}
+.muted{color:var(--ink-3);font-size:14px}
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.search{position:relative;flex:1 1 260px}
+.search svg{position:absolute;left:14px;top:13px;color:var(--ink-3)}
+.search .inp{padding-left:44px}
+.picks{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;min-width:0}
+.picks::-webkit-scrollbar{display:none}
+.picks label{position:relative;flex:none}
+.pick{flex:none;height:40px;border-radius:12px;border:1px solid var(--line);background-color:var(--surface);padding-left:13px;font-size:14px;font-weight:600;color:var(--ink-2)}
+.pick.on{border-color:var(--ink);color:var(--ink)}
+@media(max-width:599px){.picks{flex:1 1 100%;margin:0 -16px;padding:0 16px}}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px}
+.chips::-webkit-scrollbar{display:none}
+@media(min-width:600px){.chips{flex-wrap:wrap;margin:0;padding:0;overflow:visible}}
+.chip{flex:none;display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 13px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:14px;font-weight:600;color:var(--ink-2)}
+.chip[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--c);flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+
+/* ── Vitrine : les cartes en slab ────────────── */
+.vitrine{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(min-width:600px){.vitrine{grid-template-columns:repeat(auto-fill,minmax(188px,1fr));gap:16px}}
+@media(min-width:1200px){.vitrine{grid-template-columns:repeat(auto-fill,minmax(206px,1fr));gap:20px}}
+.slab{position:relative;display:flex;flex-direction:column;gap:6px;min-width:0;padding:6px;border-radius:16px;border:1px solid var(--line);background:linear-gradient(165deg,var(--surface),var(--surface-2));box-shadow:inset 0 1px 0 rgba(255,255,255,.55),var(--shadow);text-align:left;transition:transform .18s ease}
+.slab:hover{transform:translateY(-3px)}
+.label{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:2px 8px;padding:10px 10px 7px;border-radius:10px;background:var(--surface);border:1px solid var(--line);overflow:hidden}
+.label::before{content:"";position:absolute;inset:0 0 auto;height:3px;background:var(--strip,transparent)}
+.l-name{grid-column:1/-1;font-weight:700;font-size:13.5px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.l-price{font-weight:800;font-size:13.5px;text-align:right}
+.l-price .fr{margin-left:4px;font-size:10px;font-weight:800;color:var(--cobalt)}
+.cm-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
+.cm-row .btn{height:46px}
+.fld small{font-size:12.5px;color:var(--ink-3);line-height:1.35}
+.fld small a{color:var(--cobalt);font-weight:600}
+.l-id{font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.l-fin{position:absolute;left:12px;bottom:12px;z-index:2;font-size:11px;font-weight:780;padding:2px 7px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.18);background:color-mix(in srgb,var(--fc,var(--ink-3)) 16%,var(--surface));color:color-mix(in srgb,var(--fc,var(--ink-3)) 72%,var(--ink))}
+.window{position:relative;padding:7px;border-radius:10px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line),inset 0 8px 16px -12px rgba(29,26,51,.45)}
+.qty{position:absolute;bottom:12px;right:12px;z-index:2;padding:2px 8px;border-radius:8px;background:var(--ink);color:var(--bg);font-size:12px;font-weight:800}
+.card{position:relative;display:block;aspect-ratio:63/88;border-radius:4.8%/3.4%;overflow:hidden;background:var(--surface-2)}
+.card img,.card .blank{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.blank{display:grid;place-content:center;justify-items:center;gap:2px;text-align:center;padding:8px;color:var(--ink-2);background:repeating-linear-gradient(-45deg,var(--surface-2) 0 9px,color-mix(in srgb,var(--line) 60%,var(--surface-2)) 9px 10px)}
+.blank b{font-size:clamp(15px,3.6vw,20px);font-weight:800;font-stretch:80%;color:var(--ink)}
+.blank span{font-size:13px}
+/* Finitions : un liseré coloré sur l'étiquette, comme les labels de slabs gradés */
+.f-reverse{--fc:#7C8698;--strip:linear-gradient(90deg,#C7CCD6,#F4F5F8,#AAB2BF,#E8EBF0)}
+.f-holo{--fc:#3155E0;--strip:#3155E0}
+.f-fullart{--fc:#7C4DDB;--strip:#7C4DDB}
+.f-ar{--fc:#0E9C8F;--strip:#0E9C8F}
+.f-sar{--fc:#C2367F;--strip:linear-gradient(90deg,#FF8FA3,#FFD36E,#8EF0B0,#7FC8FF,#C9A0FF)}
+.f-ur{--fc:#B68400;--strip:linear-gradient(90deg,#E9B949,#FFE38A,#D9A22E)}
+.empty{display:grid;justify-items:center;gap:12px;padding:56px 20px;text-align:center;color:var(--ink-2)}
+.empty svg{width:56px;height:56px;color:var(--ink-3);stroke-width:1.4}
+.empty h2{color:var(--ink)}
+.empty p{max-width:36ch}
+
+/* ── Chercher ────────────────────────────────── */
+.results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media(min-width:600px){.results{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}}
+.hit{display:grid;gap:6px;padding:0;border:0;background:none;text-align:left;min-width:0}
+.hit .card{box-shadow:var(--shadow);transition:transform .15s}
+.hit:hover .card{transform:translateY(-3px)}
+.hit.busy{opacity:.5;pointer-events:none}
+.hit b{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hit small{font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:-4px}
+.hint-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:var(--ink-3);font-size:14px}
+
+/* ── Bilan ───────────────────────────────────── */
+.bilan{display:grid;gap:14px;align-items:start}
+@media(min-width:1000px){.bilan{grid-template-columns:1fr 1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:18px 20px}
+.panel h2{margin-bottom:6px}
+.bar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 12px;padding:10px 0;border-top:1px solid var(--line)}
+.bar:first-of-type{border-top:0}
+.bar .lbl{font-weight:620;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .lbl small{font-weight:500;color:var(--ink-3);margin-left:6px}
+.bar .val{font-weight:750}
+.bar .track{grid-column:1/-1;display:block;height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.bar .fill{display:block;height:100%;border-radius:4px;background:var(--fc,var(--ink))}
+.top{list-style:none;padding:0}
+.top li{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.top li:first-child{border-top:0}
+.top .card{width:44px;box-shadow:none}
+.top b{display:block;font-weight:680;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top small{color:var(--ink-2);font-size:12.5px}
+.top .val{font-weight:780}
+.acts{display:flex;flex-wrap:wrap;gap:8px}
+.mobile-only{display:block}
+@media(min-width:960px){.mobile-only{display:none}}
+
+/* ── Fiche (dialog) ──────────────────────────── */
+dialog.sheet{border:0;padding:0;width:100%;max-width:860px;max-height:94dvh;margin:auto auto 0;border-radius:24px 24px 0 0;background:var(--surface);color:var(--ink);box-shadow:0 -14px 40px rgba(0,0,0,.25)}
+dialog.sheet[open]{display:flex;flex-direction:column}
+dialog.sheet::backdrop{background:rgba(20,18,38,.55)}
+@media(min-width:860px){dialog.sheet{margin:auto;border-radius:24px;max-height:90dvh}}
+.sh-head{display:flex;align-items:center;gap:12px;padding:16px 18px 10px}
+.sh-head h2{flex:1;font-size:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh-body{flex:1;overflow:auto;overscroll-behavior:contain;display:grid;gap:22px;padding:4px 18px 20px}
+@media(min-width:860px){.sh-body{grid-template-columns:270px minmax(0,1fr);align-items:start;gap:30px;padding:4px 26px 26px}}
+.sh-visual{display:grid;gap:14px;justify-items:center}
+.sh-visual .slab{width:min(230px,60vw)}
+.sh-visual .slab:hover{transform:none}
+@media(min-width:860px){.sh-visual{position:sticky;top:0}.sh-visual .slab{width:100%}}
+.facts{width:100%;font-size:14px}
+.facts div{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
+.facts dt{color:var(--ink-2)}
+.facts dd{font-weight:650;text-align:right}
+.form{display:grid;gap:16px;align-content:start}
+details.fix{border:1px solid var(--line);border-radius:14px;padding:0 14px}
+details.fix summary{cursor:pointer;padding:12px 0;font-weight:620;color:var(--ink-2)}
+details.fix[open]{padding-bottom:14px}
+details.fix .form{gap:12px}
+.sh-foot{display:flex;flex-wrap:wrap;gap:8px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.sh-foot .grow{flex:1}
+@media(max-width:559px){.sh-foot .sun{flex:1 1 100%;order:-1}}
+
+/* ── Scanner plein écran ─────────────────────── */
+.scanner{position:fixed;inset:0;z-index:70;background:#0E0C1C;color:#fff;display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden}
+.sc-top{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px}
+.sc-top .round{background:rgba(255,255,255,.12);color:#fff}
+.sc-top .round[aria-pressed=true]{background:var(--sun);color:var(--sun-ink)}
+.sc-title{flex:1;font-weight:750;font-size:17px}
+.sc-count{font-size:13.5px;font-weight:650;color:var(--sun)}
+.sc-stage{position:relative;overflow:hidden;container-type:size;margin:0 10px;border-radius:22px;background:#000}
+.sc-stage video,.sc-stage .still{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.guide{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.frame{position:relative;width:min(80cqw,calc(84cqh * 63 / 88));aspect-ratio:63/88;border-radius:4.8%/3.4%;outline:2px solid rgba(255,255,255,.95);box-shadow:0 0 0 999px rgba(14,12,28,.58)}
+.band{position:absolute;left:3%;right:3%;bottom:2%;height:9%;border:2px dashed var(--sun);border-radius:7px}
+.band span{position:absolute;left:0;bottom:calc(100% + 6px);font-size:12.5px;font-weight:700;color:var(--sun);text-shadow:0 1px 3px rgba(0,0,0,.7);white-space:nowrap}
+.sc-msg{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:14px;padding:28px;text-align:center;background:#0E0C1C;color:#D6D3E6}
+.sc-msg svg{width:44px;height:44px;opacity:.55}
+.sc-msg .btn{background:#fff;color:#1D1A33;border-color:#fff}
+.reading{position:absolute;left:0;right:0;height:3px;background:var(--sun);box-shadow:0 0 18px 5px rgba(255,207,46,.6);animation:sweep 1.4s ease-in-out infinite alternate}
+@keyframes sweep{from{top:12%}to{top:88%}}
+.sc-bottom{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+.sc-bottom .btn{background:rgba(255,255,255,.1);border-color:transparent;color:#fff;height:44px;padding:0 14px}
+.sc-bottom>:first-child{justify-self:start}
+.sc-bottom>:last-child{justify-self:end}
+.shutter{width:78px;height:78px;border-radius:50%;border:0;background:var(--sun);box-shadow:0 0 0 4px #0E0C1C,0 0 0 7px var(--sun);transition:transform .1s}
+.shutter:active{transform:scale(.93)}
+.shutter:disabled{opacity:.35;cursor:not-allowed}
+.drawer{position:absolute;left:0;right:0;bottom:0;z-index:5;max-height:82%;overflow:auto;overscroll-behavior:contain;padding:10px 18px calc(18px + env(safe-area-inset-bottom));border-radius:26px 26px 0 0;background:var(--surface);color:var(--ink);box-shadow:0 -20px 40px rgba(0,0,0,.4);transform:translateY(105%);transition:transform .28s cubic-bezier(.3,.8,.3,1)}
+.drawer.open{transform:none}
+.drawer::before{content:"";display:block;width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 12px}
+.dr-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
+.dr-head p{color:var(--ink-2);font-size:14.5px;margin-top:2px}
+.strip{width:100%;border-radius:10px;border:1px solid var(--line);background:#fff;margin:4px 0 12px}
+.found{display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;align-items:center;margin-bottom:14px}
+.found .card{width:96px;box-shadow:var(--shadow)}
+.found b{display:block;font-size:18px;font-weight:780;line-height:1.2}
+.found p{color:var(--ink-2);font-size:14px}
+.found .price{color:var(--ink);font-weight:800;font-size:20px;margin-top:4px}
+.choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.choices .hit small{margin-top:0}
+.drawer .form{gap:14px}
+.drawer .duo3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.dr-acts{display:grid;gap:8px;margin-top:16px}
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--ink);animation:rot .8s linear infinite;flex:none}
+@keyframes rot{to{transform:rotate(360deg)}}
+.status{display:flex;align-items:center;gap:12px;font-weight:620}
+.side-empty{display:none}
+@media(min-width:960px){
+  .scanner{grid-template-columns:minmax(0,1fr) 440px;grid-template-rows:auto minmax(0,1fr) auto}
+  .sc-top{grid-column:1/-1}
+  .sc-stage{grid-column:1;margin:0 0 0 24px}
+  .sc-bottom{grid-column:1;padding-left:24px}
+  .drawer{position:relative;grid-column:2;grid-row:2/4;transform:none;max-height:none;margin:0 24px 24px;border-radius:22px;box-shadow:none}
+  .drawer::before{display:none}
+  .drawer:not(.open)>*{display:none}
+  .drawer:not(.open)>.side-empty{display:grid}
+  .side-empty{place-content:center;justify-items:center;gap:12px;height:100%;text-align:center;color:var(--ink-2)}
+  .side-empty svg{width:48px;height:48px;color:var(--ink-3);stroke-width:1.4}
+}
+
+/* ── Connexion ───────────────────────────────── */
+.auth{min-height:100dvh;display:grid;place-items:center;padding:28px 20px}
+.auth form{width:100%;max-width:400px;display:grid;gap:16px}
+.auth .brand{margin-bottom:16px}
+.auth h1{font-size:clamp(36px,10vw,50px)}
+.auth .lede{margin-top:-4px}
+.form-msg{min-height:20px;font-size:14px;color:var(--err)}
+.form-msg.ok{color:var(--ok)}
+
+/* ── Toast ───────────────────────────────────── */
+.toast{position:fixed;left:16px;right:16px;bottom:calc(var(--dock) + 24px + env(safe-area-inset-bottom));z-index:90;max-width:440px;margin:0 auto;padding:12px 16px;border-radius:14px;background:var(--ink);color:var(--bg);font-weight:620;font-size:14.5px;box-shadow:0 12px 30px rgba(0,0,0,.3);opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;pointer-events:none}
+.toast.show{opacity:1;transform:none}
+.toast[data-kind=err]{background:var(--err);color:#fff}
+body.scanning .toast{bottom:calc(120px + env(safe-area-inset-bottom))}
+@media(min-width:960px){.toast{left:auto;right:28px;bottom:28px;margin:0}body.scanning .toast{bottom:28px;right:500px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-brand" viewBox="0 0 32 32"><rect x="2" y="2" width="28" height="28" rx="9" fill="var(--sun)"/><rect x="10" y="7" width="12" height="18" rx="2.2" fill="none" stroke="#1D1A33" stroke-width="2.2"/><path d="M10 20.5h12" stroke="#1D1A33" stroke-width="2.2"/></symbol>
+  <symbol id="i-case" viewBox="0 0 24 24"><rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M5 7h14M8 4.8h5"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 8V5.5A2.5 2.5 0 0 1 5.5 3H8M16 3h2.5A2.5 2.5 0 0 1 21 5.5V8M21 16v2.5a2.5 2.5 0 0 1-2.5 2.5H16M8 21H5.5A2.5 2.5 0 0 1 3 18.5V16"/><path d="M7 16.5h10"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></symbol>
+  <symbol id="i-keys" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M7 14h10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 4v4h4M4 13a8 8 0 0 0 14.6 4.5M20 20v-4h-4"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M4 20h16"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2.5l1.5-2h6l1.5 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+</svg>
+
+<!-- ═══ Connexion ═══ -->
+<div class="auth" id="auth" hidden>
+  <form id="authForm" novalidate>
+    <div class="brand"><svg aria-hidden="true"><use href="#i-brand"/></svg>PokéScan</div>
+    <h1 id="authTitle">Ta collection, rangée comme en vitrine.</h1>
+    <p class="lede" id="authLede">Connecte-toi pour retrouver tes cartes sur tous tes appareils.</p>
+    <label class="fld"><span>Email</span><input class="inp" type="email" name="email" autocomplete="email" required></label>
+    <label class="fld"><span>Mot de passe</span><input class="inp" type="password" name="password" autocomplete="current-password" minlength="6" required></label>
+    <p class="form-msg" id="authMsg" role="alert"></p>
+    <button class="btn sun wide" id="authSubmit">Se connecter</button>
+    <button class="btn quiet wide" type="button" id="authSwitch">Créer un compte</button>
+  </form>
+</div>
+
+<!-- ═══ Application ═══ -->
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="brand"><svg aria-hidden="true"><use href="#i-brand"/></svg>PokéScan</div>
+    <nav class="topnav" aria-label="Navigation">
+      <button data-go="vitrine">Vitrine</button>
+      <button data-go="chercher">Chercher</button>
+      <button data-go="bilan">Bilan</button>
+    </nav>
+    <div class="top-actions">
+      <span class="who" id="who"></span>
+      <button class="btn quiet" data-action="logout"><svg class="i" aria-hidden="true"><use href="#i-out"/></svg>Déconnexion</button>
+      <button class="btn sun" data-action="scan"><svg class="i" aria-hidden="true"><use href="#i-scan"/></svg>Scanner une carte</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Vitrine -->
+    <section id="v-vitrine" aria-labelledby="h-vitrine">
+      <div class="head">
+        <h1 id="h-vitrine">Ma vitrine</h1>
+        <p class="lede" id="summary"></p>
+        <div class="filters">
+          <label class="search"><span class="sr">Filtrer ma vitrine</span><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><input class="inp" type="search" id="q" placeholder="Filtrer : nom, set, numéro" autocomplete="off"></label>
+          <div class="picks">
+            <label><span class="sr">Trier</span><select class="pick" id="fSort">
+              <option value="recent">Ajout récent</option><option value="value">Valeur</option><option value="number">Set et numéro</option><option value="name">Nom</option>
+            </select></label>
+            <label><span class="sr">Set</span><select class="pick" id="fSet"></select></label>
+            <label><span class="sr">Finition</span><select class="pick" id="fFinish"></select></label>
+          </div>
+        </div>
+        <div class="chips" id="typeChips" role="group" aria-label="Filtrer par type"></div>
+      </div>
+      <div class="vitrine" id="grid"></div>
+      <div class="empty" id="empty" hidden></div>
+    </section>
+
+    <!-- Chercher -->
+    <section id="v-chercher" aria-labelledby="h-chercher" hidden>
+      <div class="head">
+        <h1 id="h-chercher">Chercher une carte</h1>
+        <p class="lede">Tape un nom, ou le code imprimé en bas de la carte.</p>
+        <form class="filters" id="searchForm">
+          <label class="search"><span class="sr">Nom ou code</span><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><input class="inp" type="search" id="sq" placeholder="Dracaufeu ou MEG 039/132" autocomplete="off" enterkeyhint="search"></label>
+          <button class="btn ink">Chercher</button>
+        </form>
+        <p class="hint-row" id="searchInfo">Les cartes viennent de TCGdex, en français.</p>
+      </div>
+      <div class="results" id="results"></div>
+    </section>
+
+    <!-- Bilan -->
+    <section id="v-bilan" aria-labelledby="h-bilan" hidden>
+      <div class="head">
+        <h1 id="h-bilan">Bilan</h1>
+        <p class="lede" id="bilanSummary"></p>
+        <div class="acts">
+          <button class="btn sun" data-action="export"><svg class="i" aria-hidden="true"><use href="#i-download"/></svg>Exporter en Excel</button>
+          <button class="btn" id="refreshAll"><svg class="i" aria-hidden="true"><use href="#i-refresh"/></svg>Actualiser les prix</button>
+        </div>
+      </div>
+      <div class="bilan">
+        <section class="panel"><h2>Valeur par set</h2><div id="bySet"></div></section>
+        <section class="panel"><h2>Les plus chères</h2><ol class="top" id="top"></ol></section>
+        <section class="panel"><h2>Finitions</h2><div id="byFinish"></div></section>
+        <section class="panel"><h2>Types</h2><div id="byType"></div></section>
+        <section class="panel mobile-only"><h2>Compte</h2><p class="muted" id="acct"></p><div class="acts" style="margin-top:12px"><button class="btn" data-action="logout"><svg class="i" aria-hidden="true"><use href="#i-out"/></svg>Se déconnecter</button></div></section>
+      </div>
+    </section>
+  </main>
+
+  <nav class="dock" aria-label="Navigation">
+    <button data-go="vitrine"><svg class="i" aria-hidden="true"><use href="#i-case"/></svg>Vitrine</button>
+    <button data-go="chercher"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg>Chercher</button>
+    <button class="dock-scan" data-action="scan"><svg class="i" aria-hidden="true"><use href="#i-scan"/></svg>Scanner</button>
+    <button data-go="bilan"><svg class="i" aria-hidden="true"><use href="#i-chart"/></svg>Bilan</button>
+  </nav>
+</div>
+
+<!-- ═══ Scanner ═══ -->
+<div class="scanner" id="scanner" role="dialog" aria-modal="true" aria-label="Scanner une carte" hidden>
+  <div class="sc-top">
+    <button class="round" id="scClose" aria-label="Fermer le scanner"><svg class="i"><use href="#i-x"/></svg></button>
+    <span class="sc-title">Scanner</span>
+    <span class="sc-count" id="scCount"></span>
+    <button class="round" id="torch" aria-label="Lampe" aria-pressed="false" hidden><svg class="i"><use href="#i-bolt"/></svg></button>
+  </div>
+  <div class="sc-stage" id="stage">
+    <video id="video" playsinline muted autoplay></video>
+    <img class="still" id="still" alt="" hidden>
+    <div class="guide" aria-hidden="true"><div class="frame"><div class="band"><span>Code et numéro bien nets ici</span></div></div></div>
+    <div class="reading" id="reading" hidden></div>
+    <div class="sc-msg" id="scMsg">
+      <svg class="i" aria-hidden="true"><use href="#i-camera"/></svg>
+      <p id="scMsgText">Activation de la caméra…</p>
+      <button class="btn" id="camRetry" hidden>Activer la caméra</button>
+    </div>
+  </div>
+  <div class="drawer" id="drawer" aria-live="polite">
+      <div class="side-empty"><svg class="i" aria-hidden="true"><use href="#i-case"/></svg><p>Cadre une carte puis appuie sur le déclencheur. Le résultat s'affiche ici.</p></div>
+  </div>
+  <div class="sc-bottom">
+    <label class="btn"><svg class="i" aria-hidden="true"><use href="#i-image"/></svg>Photo<input type="file" accept="image/*" id="fileInput" hidden></label>
+    <button class="shutter" id="shutter" aria-label="Lire la carte" disabled></button>
+    <button class="btn" id="typeBtn"><svg class="i" aria-hidden="true"><use href="#i-keys"/></svg>Taper</button>
+  </div>
+</div>
+
+<dialog class="sheet" id="sheet" aria-labelledby="shTitle"></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════
+//  Architecture — aucune clé secrète, aucun service payant
+//  · Supabase : connexion + table « cards » (clé publishable = publique,
+//    la sécurité vient des règles RLS côté base)
+//  · TCGdex : base publique des cartes, images et prix (sans clé)
+//  · Tesseract.js : lecture du code en bas de carte, dans le téléphone
+// ════════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://xxttvynrintaajemskgo.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Tkkwptl6pW6lcseOQB86iw_HN8JQymg';
+const TCGDEX = 'https://api.tcgdex.net/';
+const TESSERACT_SRC = 'https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js';
+const XLSX_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── Référentiels ────────────────────────────────────────────
+const TYPES = {
+  'Plante':'#3E9B46','Feu':'#E2552D','Eau':'#2E8FD6','Électrique':'#E0B000','Psy':'#9B5BB5',
+  'Combat':'#B5652E','Obscurité':'#3C4A56','Métal':'#8A96A3','Fée':'#D9679E','Dragon':'#B49A2B','Incolore':'#A9ADB5'
+};
+const TYPE_ALIAS = {
+  'Électrik':'Électrique','Electrique':'Électrique','Obscur':'Obscurité','Acier':'Métal','Normal':'Incolore',
+  'Grass':'Plante','Fire':'Feu','Water':'Eau','Lightning':'Électrique','Psychic':'Psy','Fighting':'Combat',
+  'Darkness':'Obscurité','Metal':'Métal','Fairy':'Fée','Colorless':'Incolore'
+};
+const FINISHES = ['Standard','Reverse Holo','Holo','Full Art','AR','SAR','UR'];
+const FIN_CLASS = {'Reverse Holo':'f-reverse','Holo':'f-holo','Full Art':'f-fullart','AR':'f-ar','IR':'f-ar','SAR':'f-sar','SIR':'f-sar','UR':'f-ur'};
+const LANGS = {fr:'Français',en:'Anglais',de:'Allemand',it:'Italien',es:'Espagnol',ja:'Japonais'};
+const CONDITIONS = ['Mint','Near Mint','Excellent','Good','Light Played','Played','Poor'];
+const COLUMNS = ['name','types','set_code','number','finish','lang','set_name','image_url','price_eur','price_usd','price_updated_at','price_fr','price_fr_at','price_fr_src','price_fr_low','valo_id','tcg_id','rarity','quantity','condition','notes'];
+// Sigles imprimés sur les cartes → identifiant TCGdex. Ce n'est qu'une préférence :
+// le set est toujours confirmé par le nombre de cartes imprimé (ex. /132).
+const SET_HINTS = {
+  SSH:'swsh1',RCL:'swsh2',DAA:'swsh3',CPA:'swsh3.5',VIV:'swsh4',SHF:'swsh4.5',BST:'swsh5',CRE:'swsh6',EVS:'swsh7',
+  FST:'swsh8',BRS:'swsh9',ASR:'swsh10',PGO:'swsh10.5',LOR:'swsh11',SIT:'swsh12',CRZ:'swsh12.5',
+  SVI:'sv01',PAL:'sv02',OBF:'sv03',MEW:'sv03.5',PAR:'sv04',PAF:'sv04.5',TEF:'sv05',TWM:'sv06',SFA:'sv06.5',
+  SCR:'sv07',SSP:'sv08',PRE:'sv08.5',JTG:'sv09',DRI:'sv10',WHT:'sv10.5w',BLK:'sv10.5b',
+  MEG:'me01',PFL:'me02',ASC:'me02.5'
+};
+const OCR_LANGS = {FR:'fr',EN:'en',DE:'de',IT:'it',ES:'es',PT:'pt',NL:'nl',JP:'ja'};
+
+// ── État ────────────────────────────────────────────────────
+let user = null, cards = [], view = 'vitrine';
+const filt = { q:'', type:null, set:'', finish:'', sort:'recent' };
+let stream = null, scan = { state:'idle' }, added = 0;
+
+// ── Outils ──────────────────────────────────────────────────
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const eurF = new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'});
+const usdF = new Intl.NumberFormat('fr-FR',{style:'currency',currency:'USD'});
+const money = v => v == null || v === '' ? '' : eurF.format(Number(v));
+const qtyOf = c => Math.max(1, c.quantity || 1);
+const priceOf = c => c.price_fr != null ? Number(c.price_fr) : c.price_eur != null ? Number(c.price_eur) : null;
+const valueOf = c => (priceOf(c) || 0) * qtyOf(c);
+const numKey = n => String(n ?? '').split('/')[0].trim().toUpperCase().replace(/^0+(?=\w)/, '');
+const plural = (n, one, many) => `${n.toLocaleString('fr-FR')} ${n > 1 ? many : one}`;
+const pos = v => (typeof v === 'number' && v > 0) ? v : null;
+const store = {
+  get(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+function normTypes(arr){
+  const out = [];
+  for (const t of (Array.isArray(arr) ? arr : [])){ const k = TYPE_ALIAS[t] || t; if (TYPES[k] && !out.includes(k)) out.push(k); }
+  return out;
+}
+const imgUrl = (url, size = 'low') => !url ? '' : /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url) ? url : `${url}/${size}.webp`;
+function cardImg(c, size = 'low'){
+  return `<span class="card"><span class="blank" aria-hidden="true"><b>${esc(c.set_code || '—')}</b><span class="tab">${esc(c.number || '')}</span></span>${
+    c.image_url ? `<img src="${esc(imgUrl(c.image_url, size))}" alt="" loading="lazy" decoding="async" data-fallback>` : ''}</span>`;
+}
+function slab(c, size = 'low', tag = 'button'){
+  const fc = FIN_CLASS[c.finish] || '';
+  const id = [c.set_code, c.number].filter(Boolean).join(' ') || '—';
+  return `<${tag} class="slab ${fc}" ${tag === 'button' ? `data-id="${esc(c.id)}" aria-label="${esc(c.name)}, ${esc(id)}${fc ? ', ' + esc(c.finish) : ''}"` : ''}>
+    <span class="label"><span class="l-name">${esc(c.name)}</span><span class="l-id tab">${esc(id)}</span><span class="l-price tab">${priceOf(c) != null ? money(priceOf(c)) + (c.price_fr != null ? '<small class="fr">FR</small>' : '') : ''}</span></span>
+    <span class="window">${cardImg(c, size)}${fc ? `<span class="l-fin">${esc(c.finish)}</span>` : ''}${qtyOf(c) > 1 ? `<span class="qty tab">×${qtyOf(c)}</span>` : ''}</span>
+  </${tag}>`;
+}
+function dupKey(x){
+  const n = numKey(x.number);
+  const base = x.tcg_id ? x.tcg_id : (x.set_code && n ? `${String(x.set_code).toUpperCase()}#${n}` : String(x.name || '').trim().toLowerCase());
+  return `${base}|${x.finish || 'Standard'}|${x.lang || 'fr'}`;
+}
+let toastTimer;
+function toast(msg, kind = 'ok'){
+  const t = $('#toast'); t.textContent = msg; t.dataset.kind = kind; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), kind === 'err' ? 6500 : 3000);
+}
+function busy(btn, on, label){
+  if (!btn) return;
+  if (on){ btn.dataset.html = btn.innerHTML; btn.classList.add('busy'); if (label) btn.textContent = label; }
+  else { btn.classList.remove('busy'); if (btn.dataset.html) btn.innerHTML = btn.dataset.html; }
+}
+function loadScript(src){
+  return new Promise((ok, ko) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => ko(new Error('chargement impossible')); document.head.appendChild(s); });
+}
+document.addEventListener('error', e => {
+  if (e.target.tagName === 'IMG' && e.target.hasAttribute('data-fallback')) e.target.remove();
+}, true);
+
+// ════════════════════════════════════════════════════════════
+//  TCGdex (public, sans clé). Si le navigateur ne le joint pas,
+//  on passe par le relais Supabase « tcgdex » (lui aussi sans clé).
+// ════════════════════════════════════════════════════════════
+let viaRelay = false;
+const memo = new Map();
+async function tcg(path){
+  if (memo.has(path)) return memo.get(path);
+  const p = (async () => {
+    if (!viaRelay){
+      try {
+        const r = await fetch(TCGDEX + path);
+        if (r.status === 404) return null;
+        if (r.ok) return await r.json();
+      } catch (e) { if (!(e instanceof TypeError)) throw e; }
+      viaRelay = true;
+    }
+    const { data, error } = await sb.functions.invoke('tcgdex', { body:{ path } });
+    if (error){ if (error.context?.status === 404) return null; throw new Error('TCGdex ne répond pas. Réessaie dans un instant.'); }
+    return data;
+  })();
+  memo.set(path, p);
+  p.catch(() => memo.delete(path));
+  return p;
+}
+const isPocket = id => /^(A\d|B\d|P-[AB])/i.test(id);
+async function getSets(lang){
+  const key = `ps_sets_${lang}`, cached = store.get(key);
+  if (cached && Date.now() - cached.t < 3 * 864e5) return cached.d;
+  const list = await tcg(`v2/${lang}/sets`) || [];
+  const d = list.filter(s => !isPocket(s.id)).map(s => ({ id:s.id, name:s.name, official:s.cardCount?.official ?? null }));
+  store.set(key, { t:Date.now(), d });
+  return d;
+}
+const setIdOf = cardId => cardId.slice(0, cardId.lastIndexOf('-'));
+function learned(){ return store.get('ps_codes', {}); }
+function learn(code, setId){ if (!code || !setId) return; const m = learned(); m[code] = setId; store.set('ps_codes', m); }
+function codeForSet(setId){
+  const m = { ...Object.fromEntries(Object.entries(SET_HINTS)), ...learned() };
+  return Object.keys(m).find(k => m[k] === setId) || null;
+}
+function finishFor(card){
+  const r = String(card.rarity || '').toLowerCase();
+  if (/spéciale|special/.test(r)) return 'SAR';
+  if (/illustration/.test(r)) return 'AR';
+  if (/hyper|ultra|secrète|secret|gold|dorée/.test(r)) return 'UR';
+  if (card.variants && card.variants.holo && !card.variants.normal) return 'Holo';
+  return 'Standard';
+}
+function pricesFor(card, finish){
+  const cm = card?.pricing?.cardmarket, tp = card?.pricing?.tcgplayer;
+  const rev = finish === 'Reverse Holo';
+  const eur = cm ? (rev ? (pos(cm['trend-holo']) ?? pos(cm['avg-holo']) ?? pos(cm.trend) ?? pos(cm.avg))
+                        : (pos(cm.trend) ?? pos(cm.avg) ?? pos(cm['trend-holo']))) : null;
+  let usd = null;
+  if (tp){
+    const v = rev ? (tp['reverse-holofoil'] ?? tp.normal) : finish === 'Standard' ? (tp.normal ?? tp.holofoil) : (tp.holofoil ?? tp.normal);
+    usd = pos(v?.marketPrice) ?? pos(v?.midPrice);
+  }
+  return { price_eur: eur, price_usd: usd };
+}
+async function fullCard(id, lang){
+  let c = await tcg(`v2/${lang}/cards/${encodeURIComponent(id)}`);
+  if (c && !c.image && lang !== 'en'){ const en = await tcg(`v2/en/cards/${encodeURIComponent(id)}`).catch(() => null); if (en?.image) c = { ...c, image:en.image }; }
+  return c;
+}
+// ── Cote FR (Valo, via la fonction Supabase « valo » qui garde la clé) ──
+const FR_SRC = { ebay_30d:'ventes eBay sur 30 jours', ebay_3m:'ventes eBay sur 3 mois', cardmarket:'offres Cardmarket en français',
+  cardmarket_fr:'offres Cardmarket en français', us_market:'marché US converti en euros', manuel:'saisie à la main' };
+let valoOff = false, valoOffMsg = ''; // devient vrai si la clé Valo n'est pas configurée
+async function fetchFr(c){
+  if (valoOff) throw new Error(valoOffMsg);
+  const { data, error } = await sb.functions.invoke('valo', { body:{ valo_id:c.valo_id ?? null, name:c.name, number:c.number, set_name:c.set_name, lang:c.lang || 'fr', finish:c.finish } });
+  if (error){
+    let msg = error.message, status = error.context?.status, j = null;
+    try { j = await error.context.json(); if (j?.error) msg = j.error; } catch {}
+    if (status === 404) msg = 'Cote FR indisponible : la fonction « valo » n\'est pas déployée.';
+    if (j?.code === 'no_key' || status === 404){ valoOff = true; valoOffMsg = msg; }
+    const err = new Error(msg); err.status = status; throw err;
+  }
+  if (!data?.match) return { miss:true, reason:data?.reason };
+  return { valo_id:data.valo_id, price_fr:data.price ?? null, price_fr_src:data.source ?? null, price_fr_low:data.fr_low ?? null, price_fr_at:new Date().toISOString(), sales:data.sales_count };
+}
+// Cote FR en arrière-plan juste après un ajout (sans bloquer l'interface)
+async function autoFr(id){
+  const c = cards.find(x => x.id === id); if (!c || valoOff) return;
+  try {
+    const r = await fetchFr(c);
+    if (r && !r.miss){ await patchCard(id, r); if (view === 'vitrine') renderGrid(); if (view === 'bilan') renderBilan(); }
+  } catch (err) { if (!valoOff && err.status === 429) toast(err.message, 'err'); }
+}
+// Lien vers la recherche Cardmarket (le nom anglais est mémorisé quand on le connaît)
+function cmUrl(c){
+  const q = c.name_en || c.name || '';
+  return `https://www.cardmarket.com/fr/Pokemon/Products/Search?searchString=${encodeURIComponent(q.replace(/-ex$/i, ' ex'))}`;
+}
+// Transforme une carte TCGdex en ligne de collection
+function recordFrom(card, { lang = 'fr', code = null, finish = null } = {}){
+  const fin = finish || finishFor(card);
+  const official = card.set?.cardCount?.official;
+  const local = String(card.localId);
+  const number = official ? `${local}/${String(official).padStart(/^\d+$/.test(local) ? local.length : 0, '0')}` : local;
+  return {
+    tcg_id: card.id, name: card.name, lang, set_name: card.set?.name ?? null,
+    set_code: code || codeForSet(card.set?.id) || null, number, finish: fin, rarity: card.rarity ?? null,
+    types: normTypes(card.types), image_url: card.image ?? null, quantity: 1, condition: 'Near Mint',
+    ...pricesFor(card, fin), price_updated_at: new Date().toISOString()
+  };
+}
+// Trouve une carte à partir de « MEG FR 039/132 »
+async function findByCode({ code, number, total, lang }){
+  const L = LANGS[lang] ? lang : 'fr';
+  const sets = await getSets(L);
+  const tot = parseInt(total, 10);
+  const pref = code ? (learned()[code] || SET_HINTS[code]) : null;
+  const idx = new Map(sets.map((s, i) => [s.id, i]));
+  // Sets dont le nombre imprimé correspond, les plus récents d'abord
+  const cands = Number.isFinite(tot) ? sets.filter(s => s.official === tot && s.id !== pref).sort((a, b) => idx.get(b.id) - idx.get(a.id)).slice(0, 7) : [];
+  // Le sigle connu passe en premier, même si le total a été mal lu
+  const hit = pref && sets.find(s => s.id === pref);
+  if (hit) cands.unshift(hit);
+  const found = [];
+  for (const s of cands){
+    const set = await tcg(`v2/${L}/sets/${encodeURIComponent(s.id)}`);
+    const b = set?.cards?.find(c => numKey(c.localId) === numKey(number));
+    if (b){
+      const c = await fullCard(b.id, L);
+      if (c) found.push(c);
+      if (s.id === pref && c) break; // le sigle confirme le set : inutile de chercher plus loin
+    }
+  }
+  return { lang:L, cards:found };
+}
+async function searchByName(q, lang = 'fr'){
+  const [list, sets] = await Promise.all([tcg(`v2/${lang}/cards?name=${encodeURIComponent(q)}`), getSets(lang)]);
+  const order = new Map(sets.map((s, i) => [s.id, i]));
+  const byId = new Map(sets.map(s => [s.id, s]));
+  return (list || []).filter(c => !isPocket(c.id))
+    .map(c => ({ ...c, setId:setIdOf(c.id) }))
+    .sort((a, b) => (order.get(b.setId) ?? -1) - (order.get(a.setId) ?? -1))
+    .slice(0, 72)
+    .map(c => ({ ...c, set:byId.get(c.setId) }));
+}
+
+// ════════════════════════════════════════════════════════════
+//  Lecture du code (Tesseract.js, dans le navigateur)
+// ════════════════════════════════════════════════════════════
+let ocrReady = null;
+function getOcr(onStatus){
+  if (!ocrReady){
+    ocrReady = (async () => {
+      onStatus?.('Premier scan : chargement du lecteur de texte (quelques secondes)…');
+      if (!window.Tesseract) await loadScript(TESSERACT_SRC);
+      const w = await Tesseract.createWorker('eng', 1);
+      await w.setParameters({ tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/ ', tessedit_pageseg_mode:'11' });
+      return w;
+    })();
+    ocrReady.catch(() => { ocrReady = null; });
+  }
+  return ocrReady;
+}
+// Découpe une bande horizontale, l'agrandit (≈160 px de haut) et renforce le contraste.
+// mode : 'gray' (niveaux de gris étirés), 'inv' (inversé, texte clair sur fond foncé), 'otsu' (noir et blanc)
+function bandCanvas(src, y0, y1, mode = 'gray', targetH = 160){
+  const W = src.width, H = src.height, sy = Math.round(H * y0), sh = Math.max(8, Math.round(H * (y1 - y0)));
+  const k = Math.max(.5, Math.min(6, targetH / sh));
+  const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(sh * k);
+  const g = c.getContext('2d', { willReadFrequently:true });
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(src, 0, sy, W, sh, 0, 0, c.width, c.height);
+  const img = g.getImageData(0, 0, c.width, c.height), d = img.data, n = d.length / 4, lum = new Float32Array(n), hist = new Uint32Array(256);
+  for (let i = 0, j = 0; i < d.length; i += 4, j++){ const v = (d[i] * 299 + d[i+1] * 587 + d[i+2] * 114) / 1000; lum[j] = v; hist[v | 0]++; }
+  const pct = q => { let acc = 0; for (let v = 0; v < 256; v++){ acc += hist[v]; if (acc >= n * q) return v; } return 255; };
+  const lo = pct(.02), hi = Math.max(lo + 1, pct(.98));
+  let th = 128;
+  if (mode === 'otsu'){
+    let sum = 0; for (let v = 0; v < 256; v++) sum += v * hist[v];
+    let sB = 0, wB = 0, best = 0;
+    for (let v = 0; v < 256; v++){ wB += hist[v]; if (!wB) continue; const wF = n - wB; if (!wF) break; sB += v * hist[v];
+      const mB = sB / wB, mF = (sum - sB) / wF, b = wB * wF * (mB - mF) ** 2; if (b > best){ best = b; th = v; } }
+  }
+  for (let i = 0, j = 0; i < d.length; i += 4, j++){
+    let v = mode === 'otsu' ? (lum[j] > th ? 255 : 0) : Math.max(0, Math.min(255, (lum[j] - lo) / (hi - lo) * 255));
+    if (mode === 'inv') v = 255 - v;
+    d[i] = d[i+1] = d[i+2] = v; d[i+3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+function parseStrip(text){
+  const t = ' ' + String(text).toUpperCase().replace(/[|\\]/g, '/').replace(/\s+/g, ' ') + ' ';
+  const m = t.match(/([0-9OQDILSBZ]{1,3}) ?\/ ?([0-9OQDILSBZ]{2,3})(?![0-9])/);
+  if (!m) return null;
+  const fix = s => s.replace(/[OQD]/g,'0').replace(/[IL]/g,'1').replace(/S/g,'5').replace(/B/g,'8').replace(/Z/g,'2');
+  const number = fix(m[1]), total = fix(m[2]);
+  if (!/^\d+$/.test(number) || !/^\d+$/.test(total) || +total < 10) return null;
+  let code = null, lang = null;
+  const before = t.slice(0, m.index).trim().split(' ').map(s => s.replace(/[^A-Z0-9]/g, '')).filter(Boolean);
+  for (let i = before.length - 1; i >= 0 && i >= before.length - 4; i--){
+    const tok = before[i];
+    if (!lang && OCR_LANGS[tok]){ lang = OCR_LANGS[tok]; continue; }
+    if (/^[A-Z][A-Z0-9]{1,3}$/.test(tok) && !/^\d+$/.test(tok)){ code = tok; break; }
+  }
+  return { number, total, code, lang };
+}
+// Essaie plusieurs bandes du bas de la carte, en clair puis en inversé
+async function readCode(cardCanvas, onStatus, wide = false){
+  const ocr = await getOcr(onStatus);
+  // Le code est en bas à gauche des cartes récentes, en bas à droite des plus anciennes : on lit toute la largeur
+  const tries = [[.885, .995, 'gray', 160], [.885, .995, 'inv', 160], [.86, 1, 'gray', 120], [.885, .995, 'otsu', 160]];
+  if (wide) tries.push([.7, 1, 'gray', 320], [.5, 1, 'gray', 640], [0, 1, 'gray', 1400]);
+  let firstStrip = null;
+  for (const [a, b, mode, h] of tries){
+    const band = bandCanvas(cardCanvas, a, b, mode, h);
+    if (!firstStrip) firstStrip = band.toDataURL('image/png');
+    const { data } = await ocr.recognize(band);
+    const p = parseStrip(data.text);
+    if (p) return { ...p, strip: band.toDataURL('image/png'), raw:data.text };
+  }
+  return { strip:firstStrip };
+}
+
+// ── Navigation ──────────────────────────────────────────────
+function go(v){
+  if (!['vitrine','chercher','bilan'].includes(v)) v = 'vitrine';
+  view = v;
+  for (const s of ['vitrine','chercher','bilan']) $('#v-' + s).hidden = s !== v;
+  document.querySelectorAll('[data-go]').forEach(b => b.dataset.go === v ? b.setAttribute('aria-current','page') : b.removeAttribute('aria-current'));
+  if (v === 'vitrine') renderVitrine();
+  if (v === 'bilan') renderBilan();
+  if (location.hash !== '#' + v) history.replaceState(null, '', '#' + v);
+  window.scrollTo(0, 0);
+}
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-go]'); if (g){ go(g.dataset.go); return; }
+  const a = e.target.closest('[data-action]');
+  if (a){
+    if (a.dataset.action === 'scan') openScanner();
+    if (a.dataset.action === 'export') exportXlsx(a);
+    if (a.dataset.action === 'logout') sb.auth.signOut();
+  }
+  const s = e.target.closest('[data-step]');
+  if (s){ const inp = s.parentElement.querySelector('input'); inp.value = Math.max(1, (parseInt(inp.value, 10) || 1) + Number(s.dataset.step)); }
+});
+
+// ── Connexion ───────────────────────────────────────────────
+let signup = false;
+const AUTH_ERR = {
+  'Invalid login credentials':'Email ou mot de passe incorrect.',
+  'Email not confirmed':'Email pas encore confirmé : ouvre le lien reçu par email.',
+  'User already registered':'Ce compte existe déjà : connecte-toi.',
+  'Signups not allowed for this instance':'Les inscriptions sont fermées.'
+};
+$('#authSwitch').onclick = () => {
+  signup = !signup;
+  $('#authTitle').textContent = signup ? 'Crée ta vitrine.' : 'Ta collection, rangée comme en vitrine.';
+  $('#authLede').textContent = signup ? 'Un email et un mot de passe de 6 caractères au moins.' : 'Connecte-toi pour retrouver tes cartes sur tous tes appareils.';
+  $('#authSubmit').textContent = signup ? 'Créer le compte' : 'Se connecter';
+  $('#authSwitch').textContent = signup ? 'J\'ai déjà un compte' : 'Créer un compte';
+  $('#authForm [name=password]').autocomplete = signup ? 'new-password' : 'current-password';
+  $('#authMsg').textContent = '';
+};
+$('#authForm').onsubmit = async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target), msg = $('#authMsg'), btn = $('#authSubmit');
+  const email = String(fd.get('email') || '').trim(), password = String(fd.get('password') || '');
+  msg.className = 'form-msg';
+  if (!email || password.length < 6){ msg.textContent = 'Entre ton email et un mot de passe d\'au moins 6 caractères.'; return; }
+  busy(btn, true, signup ? 'Création…' : 'Connexion…');
+  const { data, error } = signup ? await sb.auth.signUp({ email, password, options:{ emailRedirectTo:location.href.split('#')[0] } }) : await sb.auth.signInWithPassword({ email, password });
+  busy(btn, false);
+  if (error){ msg.textContent = AUTH_ERR[error.message] || error.message; return; }
+  if (signup && !data.session){ msg.className = 'form-msg ok'; msg.textContent = 'Compte créé. Ouvre le lien reçu par email pour le confirmer.'; }
+};
+sb.auth.onAuthStateChange((_e, session) => setTimeout(() => setUser(session?.user ?? null), 0));
+function setUser(u){
+  if (u && user?.id === u.id) return;
+  user = u;
+  $('#auth').hidden = !!u; $('#app').hidden = !u;
+  if (!u){ cards = []; closeScanner(); return; }
+  $('#who').textContent = u.email; $('#acct').textContent = `Connecté avec ${u.email}`;
+  go(location.hash.slice(1));
+  loadCards();
+}
+
+// ── Données ─────────────────────────────────────────────────
+async function loadCards(){
+  $('#summary').textContent = 'Ouverture de la vitrine…';
+  const { data, error } = await sb.from('cards').select('*').order('created_at', { ascending:false });
+  if (error){ $('#summary').textContent = ''; toast('Vitrine illisible : ' + error.message, 'err'); return; }
+  cards = data.map(c => ({ ...c, types:normTypes(c.types) }));
+  renderVitrine(); if (view === 'bilan') renderBilan();
+}
+const pick = d => Object.fromEntries(COLUMNS.filter(k => d[k] !== undefined).map(k => [k, d[k] === '' ? null : d[k]]));
+async function patchCard(id, patch){
+  const { data, error } = await sb.from('cards').update(pick(patch)).eq('id', id).select().single();
+  if (error) throw error;
+  data.types = normTypes(data.types);
+  cards = cards.map(c => c.id === id ? data : c);
+  return data;
+}
+async function addCard(d){
+  const dup = cards.find(c => dupKey(c) === dupKey(d));
+  if (dup){
+    const q = qtyOf(dup) + qtyOf(d);
+    await patchCard(dup.id, { quantity:q });
+    toast(`${dup.name} : tu en as maintenant ${q}.`);
+    return;
+  }
+  const { data, error } = await sb.from('cards').insert({ ...pick(d), user_id:user.id }).select().single();
+  if (error) throw error;
+  data.types = normTypes(data.types);
+  cards.unshift(data);
+  toast(`${data.name} est dans ta vitrine.`);
+  autoFr(data.id);
+}
+
+// ── Vitrine ─────────────────────────────────────────────────
+for (const [id, k] of [['q','q'],['fSet','set'],['fFinish','finish'],['fSort','sort']])
+  $('#' + id).addEventListener('input', e => { filt[k] = e.target.value.trim(); renderGrid(); });
+$('#typeChips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; filt.type = b.dataset.type || null; renderFilters(); renderGrid(); });
+$('#grid').addEventListener('click', e => { const s = e.target.closest('.slab'); if (s) openCard(s.dataset.id); });
+function renderVitrine(){ renderFilters(); renderGrid(); }
+function renderFilters(){
+  const sets = new Map(); cards.forEach(c => { const k = c.set_code || c.set_name; if (k) sets.set(k, c.set_name || ''); });
+  if (filt.set && !sets.has(filt.set)) filt.set = '';
+  $('#fSet').innerHTML = `<option value="">Tous les sets</option>` + [...sets].sort((a,b) => a[0].localeCompare(b[0])).map(([k,n]) => `<option value="${esc(k)}" ${filt.set===k?'selected':''}>${esc(k === n ? n : k + (n ? ' – ' + n : ''))}</option>`).join('');
+  $('#fSet').classList.toggle('on', !!filt.set);
+  const fins = [...new Set(cards.map(c => c.finish || 'Standard'))];
+  if (filt.finish && !fins.includes(filt.finish)) filt.finish = '';
+  $('#fFinish').innerHTML = `<option value="">Toutes finitions</option>` + fins.map(f => `<option ${filt.finish===f?'selected':''}>${esc(f)}</option>`).join('');
+  $('#fFinish').classList.toggle('on', !!filt.finish);
+  const types = Object.keys(TYPES).filter(t => cards.some(c => c.types.includes(t)));
+  if (filt.type && !types.includes(filt.type)) filt.type = null;
+  $('#typeChips').hidden = types.length < 2;
+  $('#typeChips').innerHTML = `<button class="chip" aria-pressed="${!filt.type}">Tous les types</button>` +
+    types.map(t => `<button class="chip" data-type="${t}" aria-pressed="${filt.type===t}"><i class="dot" style="--c:${TYPES[t]}"></i>${t}</button>`).join('');
+}
+const byNumber = (a,b) => (a.set_code||a.set_name||'').localeCompare(b.set_code||b.set_name||'') || (parseInt(numKey(a.number),10)||0) - (parseInt(numKey(b.number),10)||0);
+function filtered(){
+  const q = filt.q.toLowerCase();
+  const list = cards.filter(c =>
+    (!q || [c.name, c.set_code, c.set_name, c.number].some(v => String(v || '').toLowerCase().includes(q))) &&
+    (!filt.type || c.types.includes(filt.type)) && (!filt.set || (c.set_code || c.set_name) === filt.set) &&
+    (!filt.finish || (c.finish || 'Standard') === filt.finish));
+  if (filt.sort === 'value') list.sort((a,b) => valueOf(b) - valueOf(a));
+  if (filt.sort === 'number') list.sort(byNumber);
+  if (filt.sort === 'name') list.sort((a,b) => a.name.localeCompare(b.name, 'fr'));
+  return list;
+}
+function summaryHTML(){
+  const n = cards.reduce((s,c) => s + qtyOf(c), 0), v = cards.reduce((s,c) => s + valueOf(c), 0);
+  const sets = new Set(cards.map(c => c.set_code || c.set_name).filter(Boolean)).size;
+  return `Tes <b>${plural(n,'carte','cartes')}</b>${sets ? ` de ${plural(sets,'set','sets')}` : ''}` +
+    (v ? ` valent environ <b>${money(v)}</b> sur Cardmarket.` : '.') +
+    (cards.some(c => c.price_fr != null) ? ` <span class="muted">${plural(cards.filter(c => c.price_fr != null).length,'carte estimée','cartes estimées')} avec la cote FR.</span>` : '');
+}
+function renderGrid(){
+  const list = filtered(), grid = $('#grid'), empty = $('#empty');
+  if (!cards.length){
+    $('#summary').textContent = 'Ta vitrine attend sa première carte.';
+    grid.innerHTML = ''; empty.hidden = false;
+    empty.innerHTML = `<svg class="i" aria-hidden="true"><use href="#i-case"/></svg><h2>Aucune carte pour l'instant</h2>
+      <p>Scanne le bas d'une carte : le code et le numéro suffisent à la retrouver.</p>
+      <button class="btn sun" data-action="scan"><svg class="i" aria-hidden="true"><use href="#i-scan"/></svg>Scanner une carte</button>
+      <button class="btn quiet" data-go="chercher">ou chercher par nom</button>`;
+    return;
+  }
+  $('#summary').innerHTML = summaryHTML() + (list.length !== cards.length ? ` <span class="muted">${plural(list.length,'carte affichée','cartes affichées')}.</span>` : '');
+  empty.hidden = list.length > 0;
+  if (!list.length) empty.innerHTML = `<svg class="i" aria-hidden="true"><use href="#i-search"/></svg><h2>Rien ne correspond</h2><p>Change le filtre ou la recherche.</p>`;
+  grid.innerHTML = list.map(c => slab(c)).join('');
+}
+
+// ── Fiche carte (ajout depuis Chercher, ou modification) ────
+const sheet = $('#sheet');
+sheet.addEventListener('click', e => { if (e.target === sheet || e.target.closest('[data-close]')) sheet.close(); });
+sheet.addEventListener('close', () => document.body.classList.remove('locked'));
+function optsFinish(cur){ return FINISHES.concat(FINISHES.includes(cur) ? [] : [cur]).map(f => `<label class="opt"><input type="radio" name="finish" value="${esc(f)}" ${cur===f?'checked':''}><span>${esc(f)}</span></label>`).join(''); }
+function formHTML(d, { fix = true } = {}){
+  const types = normTypes(d.types);
+  return `<form class="form" novalidate onsubmit="return false">
+    <fieldset class="fld"><legend>Finition</legend><div class="opts">${optsFinish(d.finish || 'Standard')}</div></fieldset>
+    <div class="duo">
+      <div class="fld"><span>Exemplaires</span><div class="stepper"><button type="button" data-step="-1" aria-label="Un de moins">−</button><input class="tab" name="quantity" type="number" min="1" inputmode="numeric" value="${qtyOf(d)}" aria-label="Exemplaires"><button type="button" data-step="1" aria-label="Un de plus">+</button></div></div>
+      <label class="fld"><span>État</span><select class="inp" name="condition">${CONDITIONS.map(v => `<option ${(d.condition||'Near Mint')===v?'selected':''}>${v}</option>`).join('')}</select></label>
+    </div>
+    ${fix ? `<div class="fld"><span>Cote FR (€)</span><div class="cm-row">
+      <input class="inp tab" name="price_fr" type="text" inputmode="decimal" autocomplete="off" value="${d.price_fr != null ? String(d.price_fr).replace('.', ',') : ''}" placeholder="Vide = prix toutes langues">
+      <button type="button" class="btn" id="frBtn"><svg class="i" aria-hidden="true"><use href="#i-refresh"/></svg>Cote FR</button></div>
+      <small>${d.price_fr_src ? `Source : ${esc(FR_SRC[d.price_fr_src] || d.price_fr_src)}${d.price_fr_at ? ', le ' + new Date(d.price_fr_at).toLocaleDateString('fr-FR') : ''}. ` : 'Cote calculée par Valo sur les ventes et offres en français. '}Tu peux la corriger à la main. <a href="${esc(cmUrl(d))}" target="_blank" rel="noopener" class="cm-link">Voir sur Cardmarket</a></small></div>` : ''}
+    <label class="fld"><span>Notes</span><textarea class="inp" name="notes" rows="2" placeholder="Ex. classeur 2, page 4">${esc(d.notes)}</textarea></label>
+    ${fix ? `<details class="fix"><summary>Corriger l'identification</summary><div class="form">
+      <label class="fld"><span>Nom</span><input class="inp" name="name" value="${esc(d.name)}" autocomplete="off"></label>
+      <div class="duo"><label class="fld"><span>Code du set</span><input class="inp tab" name="set_code" value="${esc(d.set_code)}" maxlength="6" autocapitalize="characters" spellcheck="false"></label>
+      <label class="fld"><span>Numéro</span><input class="inp tab" name="number" value="${esc(d.number)}" spellcheck="false"></label></div>
+      <label class="fld"><span>Langue</span><select class="inp" name="lang">${Object.entries(LANGS).map(([k,v]) => `<option value="${k}" ${(d.lang||'fr')===k?'selected':''}>${v}</option>`).join('')}</select></label>
+      <fieldset class="fld"><legend>Type</legend><div class="opts">${Object.entries(TYPES).map(([t,c]) => `<label class="opt"><input type="checkbox" name="types" value="${t}" ${types.includes(t)?'checked':''}><span><i class="dot" style="--c:${c}"></i>${t}</span></label>`).join('')}</div></fieldset>
+    </div></details>` : ''}
+  </form>`;
+}
+function readForm(form, base){
+  const fd = new FormData(form), s = k => fd.has(k) ? String(fd.get(k) || '').trim() : undefined;
+  const out = { ...base, finish:s('finish') || 'Standard', quantity:Math.max(1, parseInt(s('quantity'), 10) || 1), condition:s('condition') || 'Near Mint', notes:s('notes') || null };
+  if (fd.has('price_fr')){ const v = parseFloat(String(fd.get('price_fr')).replace(',', '.')); out.price_fr = Number.isFinite(v) && v >= 0 ? Math.round(v * 100) / 100 : null; }
+  if (fd.has('name')){ out.name = s('name') || base.name; out.set_code = (s('set_code') || '').toUpperCase() || null; out.number = s('number') || null; out.lang = s('lang') || 'fr'; out.types = fd.getAll('types'); }
+  return out;
+}
+function factsHTML(c){
+  const rows = [['Set', c.set_name], ['Rareté', c.rarity], ['Cote FR', c.price_fr != null ? money(c.price_fr) : null],
+    ['Offre FR la moins chère (NM)', c.price_fr_low != null ? money(c.price_fr_low) : null],
+    ['Cardmarket, toutes langues', c.price_eur != null ? money(c.price_eur) : null],
+    ['TCGplayer', c.price_usd != null ? usdF.format(c.price_usd) : null], ['Valeur totale', c.price_eur != null && qtyOf(c) > 1 ? money(valueOf(c)) : null],
+    ['Cote FR du', c.price_fr_at ? new Date(c.price_fr_at).toLocaleDateString('fr-FR') : null],
+    ['Prix Cardmarket du', c.price_updated_at ? new Date(c.price_updated_at).toLocaleDateString('fr-FR') : null]].filter(r => r[1]);
+  return rows.length ? `<dl class="facts">${rows.map(([k,v]) => `<div><dt>${k}</dt><dd class="tab">${esc(v)}</dd></div>`).join('')}</dl>` : '<p class="muted">Pas de prix connu pour cette carte.</p>';
+}
+function openSheet(html){ sheet.innerHTML = html; sheet.showModal(); document.body.classList.add('locked'); }
+function openCard(id){
+  const c = cards.find(x => x.id === id); if (!c) return;
+  if (c.tcg_id && !c.name_en && (c.lang || 'fr') !== 'en'){
+    tcg(`v2/en/cards/${encodeURIComponent(c.tcg_id)}`).then(en => {
+      if (!en?.name) return; c.name_en = en.name;
+      const a = sheet.querySelector('.cm-link'); if (a && sheet.open) a.href = cmUrl(c);
+    }).catch(() => {});
+  }
+  openSheet(`<header class="sh-head"><h2 id="shTitle">${esc(c.name)}</h2><button class="round" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></header>
+    <div class="sh-body"><div class="sh-visual">${slab(c, 'high', 'div')}${factsHTML(c)}</div>${formHTML(c)}</div>
+    <footer class="sh-foot"><button class="btn danger" id="del">Retirer</button><button class="btn" id="reprice"><svg class="i" aria-hidden="true"><use href="#i-refresh"/></svg>Prix</button><span class="grow"></span><button class="btn sun" id="save">Enregistrer</button></footer>`);
+  const form = sheet.querySelector('form');
+  sheet.querySelector('#save').onclick = async e => {
+    const d = readForm(form, {}); busy(e.currentTarget, true, 'Enregistrement…');
+    if (d.price_fr !== (c.price_fr != null ? Number(c.price_fr) : null)){
+      d.price_fr_at = d.price_fr != null ? new Date().toISOString() : null;
+      d.price_fr_src = d.price_fr != null ? 'manuel' : null;
+    }
+    if (c.tcg_id && d.finish !== c.finish){ const tc = await fullCard(c.tcg_id, c.lang || 'fr').catch(() => null); if (tc) Object.assign(d, pricesFor(tc, d.finish)); }
+    try { await patchCard(id, d); sheet.close(); renderVitrine(); toast('Carte mise à jour.'); }
+    catch (err) { toast('Enregistrement impossible : ' + err.message, 'err'); busy(e.currentTarget, false); }
+  };
+  sheet.querySelector('#reprice').onclick = async e => {
+    if (!c.tcg_id){ toast('Carte saisie sans référence TCGdex : retire-la et ajoute-la depuis Chercher.', 'err'); return; }
+    busy(e.currentTarget, true, '…');
+    try { const tc = await fullCard(c.tcg_id, c.lang || 'fr'); await patchCard(id, { ...pricesFor(tc, c.finish), image_url:tc.image ?? c.image_url, price_updated_at:new Date().toISOString() });
+      renderVitrine(); openCard(id); toast('Prix actualisé.'); }
+    catch (err) { toast(err.message, 'err'); busy(e.currentTarget, false); }
+  };
+  sheet.querySelector('#frBtn').onclick = async e => {
+    busy(e.currentTarget, true, '…');
+    try {
+      const d = readForm(form, {});
+      const r = await fetchFr({ ...c, ...d, valo_id:(d.name !== c.name || d.number !== c.number) ? null : c.valo_id });
+      if (!r){ toast('Cote FR indisponible pour le moment.', 'err'); busy(e.currentTarget, false); return; }
+      if (r.miss){ toast('Valo ne trouve pas cette carte. Vérifie le nom et le numéro.', 'err'); busy(e.currentTarget, false); return; }
+      await patchCard(id, r); renderVitrine(); openCard(id);
+      toast(r.price_fr != null ? `Cote FR : ${money(r.price_fr)} (${FR_SRC[r.price_fr_src] || 'Valo'}).` : 'Valo n\'a pas assez de ventes pour coter cette carte.');
+    } catch (err) { toast(err.message, 'err'); busy(e.currentTarget, false); }
+  };
+  const del = sheet.querySelector('#del');
+  del.onclick = async () => {
+    if (!del.classList.contains('armed')){ del.classList.add('armed'); del.textContent = 'Confirmer'; return; }
+    const { error } = await sb.from('cards').delete().eq('id', id);
+    if (error){ toast('Suppression impossible : ' + error.message, 'err'); return; }
+    cards = cards.filter(x => x.id !== id); sheet.close(); renderVitrine(); toast(`${c.name} retirée de la vitrine.`);
+  };
+}
+async function openAdd(cardId, lang = 'fr', code = null){
+  const btn = document.querySelector(`.hit[data-id="${CSS.escape(cardId)}"]`); btn?.classList.add('busy');
+  try {
+    const tc = await fullCard(cardId, lang);
+    if (!tc){ toast('Carte introuvable sur TCGdex.', 'err'); return; }
+    const rec = recordFrom(tc, { lang, code });
+    openSheet(`<header class="sh-head"><h2 id="shTitle">${esc(rec.name)}</h2><button class="round" data-close aria-label="Fermer"><svg class="i"><use href="#i-x"/></svg></button></header>
+      <div class="sh-body"><div class="sh-visual">${slab(rec, 'high', 'div')}${factsHTML(rec)}</div>${formHTML(rec, { fix:false })}</div>
+      <footer class="sh-foot"><span class="grow"></span><button class="btn sun" id="addIt">Ajouter à ma vitrine</button></footer>`);
+    const form = sheet.querySelector('form');
+    form.addEventListener('change', e => { if (e.target.name === 'finish'){ Object.assign(rec, pricesFor(tc, e.target.value), { finish:e.target.value }); sheet.querySelector('.sh-visual').innerHTML = slab(rec, 'high', 'div') + factsHTML(rec); } });
+    sheet.querySelector('#addIt').onclick = async e => {
+      busy(e.currentTarget, true, 'Ajout…');
+      try { await addCard(readForm(form, rec)); sheet.close(); renderVitrine(); }
+      catch (err) { toast('Ajout impossible : ' + err.message, 'err'); busy(e.currentTarget, false); }
+    };
+  } catch (err) { toast(err.message, 'err'); }
+  finally { btn?.classList.remove('busy'); }
+}
+
+// ── Chercher ────────────────────────────────────────────────
+const CODE_RE = /^\s*([A-Za-z][A-Za-z0-9]{1,3})?\s*(?:([A-Za-z]{2})\s+)?(\d{1,3})\s*\/\s*(\d{2,3})\s*$/;
+function hitHTML(c, sub){ return `<button class="hit" data-id="${esc(c.id)}">${cardImg({ image_url:c.image, set_code:c.set?.name ? '' : '', number:c.localId })}<b>${esc(c.name)}</b><small>${esc(sub)}</small></button>`; }
+$('#searchForm').onsubmit = async e => {
+  e.preventDefault();
+  const q = $('#sq').value.trim(), info = $('#searchInfo'), res = $('#results');
+  if (q.length < 2){ info.textContent = 'Tape au moins deux lettres.'; return; }
+  info.innerHTML = '<span class="spin"></span> Recherche…'; res.innerHTML = '';
+  try {
+    const m = q.match(CODE_RE);
+    if (m){
+      const [, code, lg, number, total] = m;
+      const r = await findByCode({ code:code?.toUpperCase(), number, total, lang:OCR_LANGS[lg?.toUpperCase()] || 'fr' });
+      res.dataset.lang = r.lang; res.dataset.code = code?.toUpperCase() || '';
+      info.textContent = r.cards.length ? (r.cards.length > 1 ? `${r.cards.length} cartes portent ce numéro : choisis la tienne.` : 'Carte trouvée.') : 'Aucune carte avec ce numéro. Vérifie le nombre après la barre.';
+      res.innerHTML = r.cards.map(c => hitHTML({ ...c, image:c.image }, `${c.set?.name || ''}, ${c.localId}`)).join('');
+    } else {
+      const list = await searchByName(q);
+      res.dataset.lang = 'fr'; res.dataset.code = '';
+      info.textContent = list.length ? `${plural(list.length,'carte trouvée','cartes trouvées')}, les plus récentes d'abord.` : `Aucune carte nommée « ${q} ». Essaie le nom français exact.`;
+      res.innerHTML = list.map(c => hitHTML(c, `${c.set?.name || c.setId}, ${c.localId}${c.set?.official ? '/' + c.set.official : ''}`)).join('');
+    }
+  } catch (err) { info.textContent = err.message; }
+};
+$('#results').addEventListener('click', e => {
+  const h = e.target.closest('.hit'); if (!h) return;
+  const code = $('#results').dataset.code || null;
+  if (code) learn(code, setIdOf(h.dataset.id));
+  openAdd(h.dataset.id, $('#results').dataset.lang || 'fr', code);
+});
+
+// ════════════════════════════════════════════════════════════
+//  Scanner
+// ════════════════════════════════════════════════════════════
+function openScanner(){
+  $('#scanner').hidden = false; document.body.classList.add('locked', 'scanning');
+  added = 0; $('#scCount').textContent = '';
+  setDrawer(null); startCamera();
+}
+function closeScanner(){
+  stopCamera(); $('#scanner').hidden = true; document.body.classList.remove('locked', 'scanning');
+  if (added) renderVitrine();
+}
+$('#scClose').onclick = closeScanner;
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#scanner').hidden && !sheet.open) closeScanner(); });
+
+async function startCamera(){
+  if (stream) return;
+  const msg = $('#scMsg');
+  if (!navigator.mediaDevices?.getUserMedia){ camMsg('Ce navigateur ne donne pas accès à la caméra. Prends une photo avec « Photo » ou tape le code.'); return; }
+  msg.hidden = false; $('#scMsgText').textContent = 'Activation de la caméra…'; $('#camRetry').hidden = true;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:2560 }, height:{ ideal:1920 } } });
+    if ($('#scanner').hidden){ stopCamera(); return; }
+    const v = $('#video'); v.srcObject = stream; await v.play().catch(() => {});
+    msg.hidden = true; $('#shutter').disabled = false;
+    const track = stream.getVideoTracks()[0], caps = track.getCapabilities?.() || {};
+    $('#torch').hidden = !caps.torch; $('#torch').setAttribute('aria-pressed', 'false');
+    if (caps.focusMode?.includes('continuous')) track.applyConstraints({ advanced:[{ focusMode:'continuous' }] }).catch(() => {});
+  } catch (e) {
+    stream = null;
+    camMsg(e.name === 'NotAllowedError' ? 'Accès à la caméra refusé. Autorise-le dans les réglages du navigateur.' : 'Aucune caméra disponible. Utilise « Photo » ou « Taper ».', true);
+  }
+}
+function camMsg(text, retry = false){ $('#scMsg').hidden = false; $('#scMsgText').textContent = text; $('#camRetry').hidden = !retry; $('#shutter').disabled = true; }
+function stopCamera(){ stream?.getTracks().forEach(t => t.stop()); stream = null; $('#video').srcObject = null; $('#shutter').disabled = true; $('#torch').hidden = true; }
+$('#camRetry').onclick = () => startCamera();
+$('#torch').onclick = async e => {
+  const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+  try { await stream.getVideoTracks()[0].applyConstraints({ advanced:[{ torch:on }] }); e.currentTarget.setAttribute('aria-pressed', String(on)); } catch {}
+};
+document.addEventListener('visibilitychange', () => {
+  if ($('#scanner').hidden) return;
+  if (document.hidden) stopCamera(); else if (scan.state === 'idle') startCamera();
+});
+
+// Recadre l'image vidéo sur le contour affiché
+function captureCard(){
+  const v = $('#video'), vw = v.videoWidth, vh = v.videoHeight; if (!vw) return null;
+  const box = v.getBoundingClientRect(), f = $('.frame').getBoundingClientRect();
+  const k = Math.max(box.width / vw, box.height / vh), dx = (box.width - vw * k) / 2, dy = (box.height - vh * k) / 2;
+  const sx = Math.max(0, (f.left - box.left - dx) / k), sy = Math.max(0, (f.top - box.top - dy) / k);
+  const sw = Math.min(vw - sx, f.width / k), sh = Math.min(vh - sy, f.height / k);
+  const c = document.createElement('canvas'), m = Math.min(1, 1400 / sh);
+  c.width = Math.round(sw * m); c.height = Math.round(sh * m);
+  c.getContext('2d').drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  return c;
+}
+$('#shutter').onclick = () => {
+  const v = $('#video'), c = captureCard(); if (!c) return;
+  const f = document.createElement('canvas'), m = Math.min(1, 1280 / v.videoWidth);
+  f.width = Math.round(v.videoWidth * m); f.height = Math.round(v.videoHeight * m);
+  f.getContext('2d').drawImage(v, 0, 0, f.width, f.height);
+  runScan(c, false, f.toDataURL('image/jpeg', .8));
+};
+$('#fileInput').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const bmp = await createImageBitmap(f), c = document.createElement('canvas'), m = Math.min(1, 1600 / bmp.height);
+    c.width = Math.round(bmp.width * m); c.height = Math.round(bmp.height * m);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    runScan(c, true, null);
+  } catch { toast('Photo illisible. Essaie un JPEG ou un PNG.', 'err'); }
+};
+$('#typeBtn').onclick = () => { stopCamera(); setDrawer({ state:'manual' }); };
+
+async function runScan(canvas, wide = false, frameUrl = null){
+  stopCamera();
+  const still = $('#still');
+  still.src = frameUrl || canvas.toDataURL('image/jpeg', .85);
+  still.style.objectFit = frameUrl ? 'cover' : 'contain';
+  still.hidden = false; $('#scMsg').hidden = true; $('#reading').hidden = false;
+  setDrawer({ state:'reading', text:'Lecture du code en bas de la carte…' });
+  try {
+    const r = await readCode(canvas, text => setDrawer({ state:'reading', text }), wide);
+    if (!r.number){ setDrawer({ state:'manual', strip:r.strip, failed:true }); return; }
+    setDrawer({ state:'reading', text:`${[r.code, r.lang?.toUpperCase(), `${r.number}/${r.total}`].filter(Boolean).join(' ')} lu. Recherche de la carte…`, strip:r.strip });
+    await lookupAndShow(r);
+  } catch (err) {
+    setDrawer({ state:'manual', failed:true, error:err.message });
+  } finally { $('#reading').hidden = true; }
+}
+async function lookupAndShow(q){
+  const r = await findByCode(q);
+  if (!r.cards.length){ setDrawer({ state:'manual', strip:q.strip, failed:true, query:q, notFound:true }); return; }
+  if (r.cards.length === 1){ learn(q.code, r.cards[0].set?.id); showFound(r.cards[0], r.lang, q); return; }
+  setDrawer({ state:'choose', cards:r.cards, lang:r.lang, query:q });
+}
+function showFound(tc, lang, q){ setDrawer({ state:'found', tc, rec:recordFrom(tc, { lang, code:q?.code }), query:q }); }
+
+function setDrawer(s){
+  const d = $('#drawer');
+  scan = s || { state:'idle' };
+  const empty = '<div class="side-empty"><svg class="i" aria-hidden="true"><use href="#i-case"/></svg><p>Cadre une carte puis appuie sur le déclencheur. Le résultat s\'affiche ici.</p></div>';
+  if (!s){ d.classList.remove('open'); d.innerHTML = empty; $('#still').hidden = true; return; }
+  const strip = s.strip ? `<img class="strip" src="${s.strip}" alt="Bande lue en bas de la carte">` : '';
+  const q = s.query || {};
+  if (s.state === 'reading'){
+    d.innerHTML = empty + `<div class="status"><span class="spin"></span><span>${esc(s.text)}</span></div>${strip}`;
+  }
+  if (s.state === 'manual'){
+    d.innerHTML = empty + `<div class="dr-head"><div><h2>${s.failed ? (s.notFound ? 'Carte introuvable' : 'Code illisible') : 'Taper le code'}</h2>
+      <p>${s.error ? esc(s.error) : s.notFound ? 'Aucune carte avec ce numéro. Corrige ce qui a été lu.' : s.failed ? 'Recopie ce qui est imprimé en bas à gauche de la carte.' : 'Recopie ce qui est imprimé en bas à gauche de la carte.'}</p></div></div>
+      ${strip}
+      <form class="form" id="codeForm" novalidate>
+        <div class="duo3"><label class="fld"><span>Sigle</span><input class="inp tab" name="code" value="${esc(q.code)}" placeholder="MEG" maxlength="4" autocapitalize="characters" spellcheck="false"></label>
+        <label class="fld"><span>Numéro</span><input class="inp tab" name="number" value="${esc(q.number)}" placeholder="039" inputmode="numeric" required></label>
+        <label class="fld"><span>Sur</span><input class="inp tab" name="total" value="${esc(q.total)}" placeholder="132" inputmode="numeric" required></label></div>
+        <label class="fld"><span>Langue de la carte</span><select class="inp" name="lang">${Object.entries(LANGS).map(([k,v]) => `<option value="${k}" ${(q.lang||'fr')===k?'selected':''}>${v}</option>`).join('')}</select></label>
+        <div class="dr-acts"><button class="btn sun wide">Trouver la carte</button><button type="button" class="btn quiet wide" data-act="again">Reprendre une photo</button>
+        <button type="button" class="btn quiet wide" data-act="byname">Chercher par nom</button></div>
+      </form>`;
+    d.querySelector('#codeForm').onsubmit = async e => {
+      e.preventDefault();
+      const fd = new FormData(e.target), nq = { code:String(fd.get('code')).trim().toUpperCase() || null, number:String(fd.get('number')).trim(), total:String(fd.get('total')).trim(), lang:fd.get('lang'), strip:s.strip };
+      if (!nq.number || !nq.total){ toast('Il faut le numéro et le nombre après la barre.', 'err'); return; }
+      busy(e.submitter, true, 'Recherche…');
+      try { await lookupAndShow(nq); } catch (err) { toast(err.message, 'err'); busy(e.submitter, false); }
+    };
+  }
+  if (s.state === 'choose'){
+    d.innerHTML = empty + `<div class="dr-head"><div><h2>Laquelle est-ce ?</h2><p>${s.cards.length} sets ont une carte n° ${esc(q.number)}/${esc(q.total)}. Touche la tienne${q.code ? `, je retiendrai que « ${esc(q.code)} » désigne ce set` : ''}.</p></div></div>
+      <div class="choices">${s.cards.map((c, i) => `<button class="hit" data-i="${i}">${cardImg({ image_url:c.image, number:c.localId })}<b>${esc(c.name)}</b><small>${esc(c.set?.name || '')}</small></button>`).join('')}</div>
+      <div class="dr-acts"><button class="btn quiet wide" data-act="again">Aucune : reprendre une photo</button></div>`;
+    d.querySelector('.choices').onclick = e => { const b = e.target.closest('[data-i]'); if (!b) return; const c = s.cards[+b.dataset.i]; learn(q.code, c.set?.id); showFound(c, s.lang, q); };
+  }
+  if (s.state === 'found'){
+    const r = s.rec;
+    d.innerHTML = empty + `<div class="found">${cardImg(r, 'low')}<div><b>${esc(r.name)}</b><p>${esc([r.set_name, r.number].filter(Boolean).join(', '))}</p><p>${esc(r.rarity || '')}</p>
+      <p class="price tab" id="fPrice">${r.price_eur != null ? money(r.price_eur) : 'Pas de prix publié'}</p></div></div>
+      ${formHTML(r, { fix:false })}
+      <div class="dr-acts"><button class="btn sun wide" data-act="add">Ajouter à ma vitrine</button><button class="btn quiet wide" data-act="wrong">Ce n'est pas la bonne carte</button><button class="btn quiet wide" data-act="again">Passer</button></div>`;
+    const form = d.querySelector('form');
+    form.addEventListener('change', e => { if (e.target.name === 'finish'){ Object.assign(r, pricesFor(s.tc, e.target.value)); d.querySelector('#fPrice').textContent = r.price_eur != null ? money(r.price_eur) : 'Pas de prix publié'; } });
+    d.querySelector('[data-act=add]').onclick = async e => {
+      busy(e.currentTarget, true, 'Ajout…');
+      try { await addCard(readForm(form, r)); added++; $('#scCount').textContent = `${added} ajoutée${added > 1 ? 's' : ''}`; setDrawer(null); startCamera(); }
+      catch (err) { toast('Ajout impossible : ' + err.message, 'err'); busy(e.currentTarget, false); }
+    };
+    d.querySelector('[data-act=wrong]').onclick = () => setDrawer({ state:'manual', query:s.query, strip:s.query?.strip });
+  }
+  d.querySelectorAll('[data-act=again]').forEach(b => b.onclick = () => { setDrawer(null); startCamera(); });
+  d.querySelectorAll('[data-act=byname]').forEach(b => b.onclick = () => { closeScanner(); go('chercher'); $('#sq').focus(); });
+  d.classList.add('open');
+}
+
+// ── Bilan ───────────────────────────────────────────────────
+function bars(rows, fmt, color){
+  if (!rows.length) return '<p class="muted">Rien à afficher pour l\'instant.</p>';
+  const max = Math.max(...rows.map(r => r.v), 1);
+  return rows.map(r => `<div class="bar"><span class="lbl">${esc(r.label)}${r.note ? `<small>${esc(r.note)}</small>` : ''}</span><span class="val tab">${fmt(r.v)}</span>
+    <span class="track"><span class="fill" style="width:${(r.v / max * 100).toFixed(1)}%;${color ? `--fc:${color(r)}` : ''}"></span></span></div>`).join('');
+}
+function renderBilan(){
+  const priced = cards.filter(c => priceOf(c) != null).length;
+  $('#bilanSummary').innerHTML = cards.length ? summaryHTML() + (priced < cards.length ? ` ${plural(cards.length - priced,'carte n\'a','cartes n\'ont')} pas de prix.` : '') : 'Le bilan se remplit dès ta première carte.';
+  const anyV = priced > 0, bySet = new Map();
+  cards.forEach(c => { const k = c.set_name || c.set_code || 'Sans set'; const e = bySet.get(k) || { label:k, code:c.set_code, v:0, n:0 }; e.v += valueOf(c); e.n += qtyOf(c); bySet.set(k, e); });
+  const rows = [...bySet.values()].map(e => ({ ...e, v:anyV ? e.v : e.n, note:`${e.code ? e.code + ', ' : ''}${plural(e.n,'carte','cartes')}` })).sort((a,b) => b.v - a.v).slice(0, 10);
+  $('#bySet').innerHTML = bars(rows, v => anyV ? money(v) : v);
+  const top = cards.filter(c => priceOf(c) != null).sort((a,b) => priceOf(b) - priceOf(a)).slice(0, 8);
+  $('#top').innerHTML = top.length ? top.map(c => `<li>${cardImg(c)}<span><b>${esc(c.name)}</b><small class="tab">${esc([c.set_code, c.number, c.finish !== 'Standard' ? c.finish : ''].filter(Boolean).join(' '))}</small></span><span class="val tab">${money(priceOf(c))}${c.price_fr != null ? ' <small>FR</small>' : ''}</span></li>`).join('') : '<li class="muted">Aucun prix connu pour l\'instant.</li>';
+  const fin = [...new Set(cards.map(c => c.finish || 'Standard'))].map(f => ({ label:f, v:cards.filter(c => (c.finish || 'Standard') === f).reduce((s,c) => s + qtyOf(c), 0) })).sort((a,b) => b.v - a.v);
+  const FC = { 'Reverse Holo':'#7C8698','Holo':'#3155E0','Full Art':'#7C4DDB','AR':'#0E9C8F','IR':'#0E9C8F','SAR':'#C2367F','SIR':'#C2367F','UR':'#B68400' };
+  $('#byFinish').innerHTML = bars(fin, v => v, r => FC[r.label] || 'var(--ink)');
+  const typ = Object.keys(TYPES).map(t => ({ label:t, v:cards.filter(c => c.types.includes(t)).reduce((s,c) => s + qtyOf(c), 0) })).filter(r => r.v).sort((a,b) => b.v - a.v);
+  $('#byType').innerHTML = bars(typ, v => v, r => TYPES[r.label]);
+}
+$('#refreshAll').onclick = async e => {
+  const btn = e.currentTarget, list = cards.filter(c => c.tcg_id);
+  if (!list.length){ toast('Aucune carte liée à TCGdex à actualiser.', 'err'); return; }
+  busy(btn, true); let ok = 0;
+  for (let i = 0; i < list.length; i++){
+    btn.textContent = `Prix ${i + 1} / ${list.length}…`;
+    try { const tc = await fullCard(list[i].tcg_id, list[i].lang || 'fr'); if (tc){ await patchCard(list[i].id, { ...pricesFor(tc, list[i].finish), price_updated_at:new Date().toISOString() }); ok++; } }
+    catch (err) { toast(err.message, 'err'); break; }
+  }
+  // Cotes FR : 45 cartes au plus par passage (Valo gratuit = 100 requêtes par jour), les plus anciennes d'abord
+  let fr = 0, left = 0, stop = '';
+  if (!valoOff){
+    const todo = cards.filter(c => c.price_fr_src !== 'manuel').sort((a, b) => (a.price_fr_at || '').localeCompare(b.price_fr_at || ''));
+    const day = Date.now() - 864e5;
+    const due = todo.filter(c => !c.price_fr_at || Date.parse(c.price_fr_at) < day);
+    for (let i = 0; i < due.length && i < 45; i++){
+      btn.textContent = `Cote FR ${i + 1} / ${Math.min(45, due.length)}…`;
+      try { const r = await fetchFr(due[i]); if (r && !r.miss){ await patchCard(due[i].id, r); fr++; } }
+      catch (err) { stop = err.message; break; }
+    }
+    left = Math.max(0, due.length - 45);
+  }
+  busy(btn, false); renderBilan();
+  toast(stop ? stop : `${plural(ok,'prix actualisé','prix actualisés')}, ${plural(fr,'cote FR','cotes FR')}${left ? `, ${left} à faire demain` : ''}.`, stop ? 'err' : 'ok');
+};
+
+// ── Export Excel ────────────────────────────────────────────
+async function exportXlsx(btn){
+  if (!cards.length){ toast('Ta vitrine est vide : rien à exporter.', 'err'); return; }
+  busy(btn, true, 'Préparation…');
+  try {
+    if (!window.XLSX) await loadScript(XLSX_SRC);
+    const rows = [...cards].sort(byNumber);
+    const head = ['Nom','Type(s)','Code set','Set','Numéro','Finition','Rareté','Langue','État','Quantité','Prix unitaire (€)','Valeur (€)','Prix TCGplayer ($)','Notes','Ajoutée le','Cote FR (€)','Source de la cote FR','Offre FR NM la moins chère (€)','Prix Cardmarket toutes langues (€)'];
+    const body = rows.map(c => [c.name, c.types.join(', '), c.set_code || '', c.set_name || '', c.number || '', c.finish || 'Standard', c.rarity || '', LANGS[c.lang] || c.lang || '', c.condition || '', qtyOf(c),
+      priceOf(c), priceOf(c) != null ? +valueOf(c).toFixed(2) : null, c.price_usd != null ? Number(c.price_usd) : null, c.notes || '', c.created_at ? new Date(c.created_at) : null,
+      c.price_fr != null ? Number(c.price_fr) : null, FR_SRC[c.price_fr_src] || '', c.price_fr_low != null ? Number(c.price_fr_low) : null, c.price_eur != null ? Number(c.price_eur) : null]);
+    const n = body.length + 1, ws = XLSX.utils.aoa_to_sheet([head, ...body], { cellDates:true });
+    XLSX.utils.sheet_add_aoa(ws, [['Total','','','','','','','','',{ t:'n', f:`SUM(J2:J${n})` },'',{ t:'n', f:`SUM(L2:L${n})` }]], { origin:-1 });
+    for (let r = 2; r <= n + 1; r++){
+      for (const col of ['K','L']) if (ws[col + r]) ws[col + r].z = '#,##0.00 "€"';
+      if (ws['M' + r]) ws['M' + r].z = '#,##0.00 "$"';
+      if (ws['O' + r]) ws['O' + r].z = 'dd/mm/yyyy';
+      for (const col of ['P','R','S']) if (ws[col + r]) ws[col + r].z = '#,##0.00 "€"';
+    }
+    ws['!cols'] = [28,16,9,26,10,13,24,10,13,9,15,12,16,24,12,12,28,18,22].map(w => ({ wch:w }));
+    ws['!autofilter'] = { ref:`A1:S${n}` };
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Collection');
+    XLSX.writeFile(wb, `pokescan-${new Date().toISOString().slice(0,10)}.xlsx`);
+    toast(`Export prêt : ${plural(cards.length,'ligne','lignes')}.`);
+  } catch (err) { toast('Export impossible : ' + err.message, 'err'); }
+  busy(btn, false);
+}
+
+// ── Démarrage ───────────────────────────────────────────────
+window.addEventListener('hashchange', () => { if (user) go(location.hash.slice(1)); });
+sb.auth.getSession().then(({ data }) => { if (!data.session) setUser(null); });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+</script>
+</body>
+</html>
